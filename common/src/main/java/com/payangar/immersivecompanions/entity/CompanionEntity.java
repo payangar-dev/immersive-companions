@@ -34,6 +34,7 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.ServerLevelAccessor;
+import net.minecraft.world.entity.ai.navigation.GroundPathNavigation;
 import net.minecraft.world.phys.AABB;
 
 import javax.annotation.Nullable;
@@ -60,6 +61,12 @@ public class CompanionEntity extends PathfinderMob implements RangedAttackMob {
     public CompanionEntity(EntityType<? extends CompanionEntity> entityType, Level level) {
         super(entityType, level);
         setPersistenceRequired();
+
+        // Enable door opening in pathfinding
+        if (this.getNavigation() instanceof GroundPathNavigation groundNav) {
+            groundNav.setCanOpenDoors(true);
+            groundNav.setCanPassDoors(true);
+        }
     }
 
     public static AttributeSupplier.Builder createAttributes() {
@@ -87,6 +94,9 @@ public class CompanionEntity extends PathfinderMob implements RangedAttackMob {
 
         // Priority 1: Combat - added dynamically based on type
         // Will be set in finalizeSpawn after combat type is determined
+
+        // Priority 3: Door interaction (like villagers)
+        this.goalSelector.addGoal(3, new OpenDoorGoal(this, true));
 
         // Priority 5: Village binding
         this.goalSelector.addGoal(5, new MoveTowardsRestrictionGoal(this, 1.0));

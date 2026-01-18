@@ -107,9 +107,12 @@ public class CompanionEntity extends PathfinderMob implements RangedAttackMob {
     private void registerCombatGoals() {
         // Remove any existing combat goals first
         if (getCombatType().isRanged()) {
-            // Use custom ranged attack goal with charging animation support
-            // Parameters: companion, speedModifier, attackInterval, attackRadius
-            this.goalSelector.addGoal(1, new CompanionRangedAttackGoal(this, 1.0, 20, 15.0F));
+            // Use custom ranged attack goal with charging animation and kiting behavior
+            // Parameters: companion, speedModifier, attackInterval, maxRange, minRange
+            // - Will approach targets beyond maxRange (15 blocks)
+            // - Will retreat from targets closer than minRange (6 blocks)
+            // - Will strafe and shoot while in optimal range
+            this.goalSelector.addGoal(1, new CompanionRangedAttackGoal(this, 1.0, 20, 15.0F, 6.0F));
         } else {
             this.goalSelector.addGoal(1, new MeleeAttackGoal(this, 1.0, true));
         }

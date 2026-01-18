@@ -1,0 +1,13 @@
+{
+  "required": true,
+  "minVersion": "0.8",
+  "package": "com.payangar.immersivecompanions.mixin",
+  "compatibilityLevel": "JAVA_21",
+  "mixins": [
+    "VillageStructureMixin"
+  ],
+  "client": [],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}

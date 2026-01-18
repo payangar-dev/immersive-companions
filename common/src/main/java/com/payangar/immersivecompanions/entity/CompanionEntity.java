@@ -49,8 +49,13 @@ public class CompanionEntity extends PathfinderMob implements RangedAttackMob {
             CompanionEntity.class, EntityDataSerializers.INT);
     private static final EntityDataAccessor<Boolean> DATA_CHARGING = SynchedEntityData.defineId(
             CompanionEntity.class, EntityDataSerializers.BOOLEAN);
+    private static final EntityDataAccessor<String> DATA_TEAM = SynchedEntityData.defineId(
+            CompanionEntity.class, EntityDataSerializers.STRING);
 
     private static final int MAX_SKIN_VARIANTS = 10;
+
+    /** Default team for village-spawned companions */
+    public static final String DEFAULT_TEAM = "village_guard";
 
     public CompanionEntity(EntityType<? extends CompanionEntity> entityType, Level level) {
         super(entityType, level);
@@ -72,6 +77,7 @@ public class CompanionEntity extends PathfinderMob implements RangedAttackMob {
         builder.define(DATA_COMBAT_TYPE, CompanionType.MELEE.ordinal());
         builder.define(DATA_SKIN_INDEX, 0);
         builder.define(DATA_CHARGING, false);
+        builder.define(DATA_TEAM, DEFAULT_TEAM);
     }
 
     @Override
@@ -93,12 +99,20 @@ public class CompanionEntity extends PathfinderMob implements RangedAttackMob {
         this.goalSelector.addGoal(8, new RandomLookAroundGoal(this));
 
         // Target goals
-        // Priority 2: Retaliation
-        this.targetSelector.addGoal(2, new HurtByTargetGoal(this));
+        // Priority 2: Retaliation (but not against same-team companions)
+        this.targetSelector.addGoal(2, new HurtByTargetGoal(this) {
+            @Override
+            public boolean canUse() {
+                if (!super.canUse()) return false;
+                // Don't retaliate against same-team companions
+                LivingEntity attacker = this.mob.getLastHurtByMob();
+                return !isOnSameTeam(attacker);
+            }
+        });
 
         // Priority 3: Attack monsters (filtered)
         this.targetSelector.addGoal(3, new NearestAttackableTargetGoal<>(this, Monster.class, 10, true, false,
-                entity -> shouldAttackEntity(entity)));
+                this::shouldAttackEntity));
 
         // Priority 4: Village defense
         this.targetSelector.addGoal(4, new CompanionDefendVillageGoal(this));
@@ -188,6 +202,28 @@ public class CompanionEntity extends PathfinderMob implements RangedAttackMob {
         this.entityData.set(DATA_CHARGING, charging);
     }
 
+    public String getCompanionTeam() {
+        return this.entityData.get(DATA_TEAM);
+    }
+
+    public void setCompanionTeam(String team) {
+        this.entityData.set(DATA_TEAM, team != null ? team : DEFAULT_TEAM);
+    }
+
+    /**
+     * Checks if another entity is on the same companion team.
+     * Used to prevent friendly fire and same-team targeting.
+     *
+     * @param entity The entity to check
+     * @return true if the entity is a companion on the same team
+     */
+    public boolean isOnSameTeam(@Nullable LivingEntity entity) {
+        if (entity instanceof CompanionEntity otherCompanion) {
+            return this.getCompanionTeam().equals(otherCompanion.getCompanionTeam());
+        }
+        return false;
+    }
+
     public ResourceLocation getSkinTexture() {
         return CompanionSkins.getSkin(getGender(), getSkinIndex());
     }
@@ -199,6 +235,7 @@ public class CompanionEntity extends PathfinderMob implements RangedAttackMob {
         tag.putInt("Gender", getGender().ordinal());
         tag.putInt("CombatType", getCombatType().ordinal());
         tag.putInt("SkinIndex", getSkinIndex());
+        tag.putString("Team", getCompanionTeam());
     }
 
     @Override
@@ -213,6 +250,9 @@ public class CompanionEntity extends PathfinderMob implements RangedAttackMob {
         }
         if (tag.contains("SkinIndex")) {
             setSkinIndex(tag.getInt("SkinIndex"));
+        }
+        if (tag.contains("Team")) {
+            setCompanionTeam(tag.getString("Team"));
         }
     }
 

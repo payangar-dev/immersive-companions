@@ -261,10 +261,11 @@ public class CompanionRangedAttackGoal extends Goal {
 
     /**
      * Determines if an entity is considered friendly and should not be shot.
+     * Same-team companions are always friendly, as are iron golems and villagers.
      */
     private boolean isFriendly(LivingEntity entity) {
-        // Other companions
-        if (entity instanceof CompanionEntity) {
+        // Same-team companions
+        if (companion.isOnSameTeam(entity)) {
             return true;
         }
         // Iron golems (village defenders)

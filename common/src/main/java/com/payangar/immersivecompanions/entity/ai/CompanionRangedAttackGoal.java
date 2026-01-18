@@ -25,7 +25,6 @@ public class CompanionRangedAttackGoal extends Goal {
     private final CompanionEntity companion;
     private final double speedModifier;
     private final int attackIntervalMin;
-    private final float attackRadius;
     private final float attackRadiusSqr;
     private final float minAttackRadius;
     private final float minAttackRadiusSqr;
@@ -33,7 +32,6 @@ public class CompanionRangedAttackGoal extends Goal {
     private int attackTime = -1;
     private int chargeTime = 0;
     private boolean isCharging = false;
-    private int seeTime;
     private int strafeTime = 0;
     private boolean strafingClockwise = false;
     private boolean strafingBackwards = false;
@@ -60,7 +58,6 @@ public class CompanionRangedAttackGoal extends Goal {
         this.companion = companion;
         this.speedModifier = speedModifier;
         this.attackIntervalMin = attackInterval;
-        this.attackRadius = attackRadius;
         this.attackRadiusSqr = attackRadius * attackRadius;
         this.minAttackRadius = minAttackRadius;
         this.minAttackRadiusSqr = minAttackRadius * minAttackRadius;
@@ -106,7 +103,6 @@ public class CompanionRangedAttackGoal extends Goal {
         companion.stopUsingItem();
         isCharging = false;
         chargeTime = 0;
-        seeTime = 0;
         strafeTime = 0;
         blockedShotTime = 0;
     }
@@ -129,13 +125,6 @@ public class CompanionRangedAttackGoal extends Goal {
         double distSq = companion.distanceToSqr(target.getX(), target.getY(), target.getZ());
         boolean canSee = companion.getSensing().hasLineOfSight(target);
 
-        // Track line of sight
-        if (canSee) {
-            seeTime++;
-        } else {
-            seeTime = 0;
-        }
-
         // Determine movement behavior based on distance
         boolean tooFar = distSq > attackRadiusSqr;
         boolean tooClose = distSq < minAttackRadiusSqr;
@@ -153,7 +142,7 @@ public class CompanionRangedAttackGoal extends Goal {
         } else {
             // In optimal range - strafe while attacking
             companion.getNavigation().stop();
-            handleStrafing(target, distSq);
+            handleStrafing(distSq);
             companion.getLookControl().setLookAt(target, 30.0F, 30.0F);
         }
 
@@ -342,8 +331,10 @@ public class CompanionRangedAttackGoal extends Goal {
     /**
      * Handles strafing behavior to make the companion harder to hit.
      * Periodically changes strafe direction for unpredictable movement.
+     *
+     * @param distSq Squared distance to target, used to adjust forward/backward movement
      */
-    private void handleStrafing(LivingEntity target, double distSq) {
+    private void handleStrafing(double distSq) {
         strafeTime++;
 
         // Change strafe direction periodically

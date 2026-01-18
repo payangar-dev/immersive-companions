@@ -4,11 +4,13 @@ import com.payangar.immersivecompanions.ImmersiveCompanions;
 import com.payangar.immersivecompanions.entity.CompanionEntity;
 import com.payangar.immersivecompanions.registry.ModEntityTypes;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.entity.MobSpawnType;
 import net.minecraft.world.entity.npc.Villager;
 import net.minecraft.world.level.ChunkPos;
+import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.levelgen.Heightmap;
 import net.minecraft.world.phys.AABB;
 
@@ -123,7 +125,8 @@ public class CompanionSpawnLogic {
             BlockPos pos = new BlockPos(x, y, z);
 
             // Check if position is valid for spawning
-            if (level.getBlockState(pos.below()).isSolid() &&
+            BlockState floorState = level.getBlockState(pos.below());
+            if (floorState.isFaceSturdy(level, pos.below(), Direction.UP) &&
                     level.getBlockState(pos).isAir() &&
                     level.getBlockState(pos.above()).isAir()) {
                 return pos;

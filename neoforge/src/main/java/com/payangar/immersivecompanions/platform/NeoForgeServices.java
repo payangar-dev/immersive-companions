@@ -1,5 +1,6 @@
 package com.payangar.immersivecompanions.platform;
 
+import net.neoforged.fml.ModList;
 import net.neoforged.fml.loading.FMLLoader;
 import net.neoforged.fml.loading.FMLPaths;
 
@@ -19,5 +20,10 @@ public class NeoForgeServices implements Services {
     @Override
     public String getLoaderName() {
         return "NeoForge";
+    }
+
+    @Override
+    public boolean isModLoaded(String modId) {
+        return ModList.get().isLoaded(modId);
     }
 }

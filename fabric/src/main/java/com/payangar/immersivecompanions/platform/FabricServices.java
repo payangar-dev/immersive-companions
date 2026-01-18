@@ -19,4 +19,9 @@ public class FabricServices implements Services {
     public String getLoaderName() {
         return "Fabric";
     }
+
+    @Override
+    public boolean isModLoaded(String modId) {
+        return FabricLoader.getInstance().isModLoaded(modId);
+    }
 }

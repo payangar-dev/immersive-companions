@@ -1,6 +1,7 @@
 package com.payangar.immersivecompanions.entity.ai;
 
 import com.payangar.immersivecompanions.entity.CompanionEntity;
+import net.minecraft.world.InteractionHand;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.ai.goal.Goal;
 import net.minecraft.world.item.CrossbowItem;
@@ -36,9 +37,12 @@ public class CompanionRangedAttackGoal extends Goal {
     /**
      * Gets the charge time based on the equipped weapon.
      * Crossbows take slightly longer to charge than bows.
+     * Times are slightly longer than animation duration to ensure full visual completion.
      */
     private int getChargeTime() {
-        return companion.getMainHandItem().getItem() instanceof CrossbowItem ? 25 : 20;
+        // Bow full draw animation: ~20 ticks, crossbow load: ~25 ticks
+        // Add buffer for animation to fully complete before shooting
+        return companion.getMainHandItem().getItem() instanceof CrossbowItem ? 35 : 30;
     }
 
     @Override
@@ -66,6 +70,7 @@ public class CompanionRangedAttackGoal extends Goal {
         super.stop();
         companion.setAggressive(false);
         companion.setCharging(false);
+        companion.stopUsingItem();
         isCharging = false;
         chargeTime = 0;
         seeTime = 0;
@@ -81,6 +86,7 @@ public class CompanionRangedAttackGoal extends Goal {
         LivingEntity target = companion.getTarget();
         if (target == null) {
             companion.setCharging(false);
+            companion.stopUsingItem();
             isCharging = false;
             return;
         }
@@ -101,6 +107,7 @@ public class CompanionRangedAttackGoal extends Goal {
             // Reset charging if we need to move
             if (isCharging) {
                 companion.setCharging(false);
+                companion.stopUsingItem();
                 isCharging = false;
                 chargeTime = 0;
             }
@@ -122,6 +129,8 @@ public class CompanionRangedAttackGoal extends Goal {
             isCharging = true;
             chargeTime = 0;
             companion.setCharging(true);
+            // Start using the item to trigger vanilla bow/crossbow animations
+            companion.startUsingItem(InteractionHand.MAIN_HAND);
         }
 
         chargeTime++;
@@ -135,6 +144,7 @@ public class CompanionRangedAttackGoal extends Goal {
 
             // Reset state
             companion.setCharging(false);
+            companion.stopUsingItem();
             isCharging = false;
             chargeTime = 0;
             attackTime = attackIntervalMin;

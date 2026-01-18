@@ -6,6 +6,7 @@ public interface Services {
     Path getConfigDir();
     boolean isDevelopmentEnvironment();
     String getLoaderName();
+    boolean isModLoaded(String modId);
 
     static Services get() {
         return Holder.INSTANCE;

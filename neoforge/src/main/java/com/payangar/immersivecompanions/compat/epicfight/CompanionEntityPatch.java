@@ -2,9 +2,11 @@ package com.payangar.immersivecompanions.compat.epicfight;
 
 import com.payangar.immersivecompanions.config.ModConfig;
 import com.payangar.immersivecompanions.entity.CompanionEntity;
+import net.minecraft.world.InteractionHand;
 import yesman.epicfight.api.animation.Animator;
 import yesman.epicfight.api.animation.LivingMotions;
 import yesman.epicfight.gameasset.Animations;
+import yesman.epicfight.model.armature.types.ToolHolderArmature;
 import yesman.epicfight.world.capabilities.entitypatch.Factions;
 import yesman.epicfight.world.capabilities.entitypatch.HumanoidMobPatch;
 import yesman.epicfight.world.entity.ai.goal.AnimatedAttackGoal;
@@ -67,8 +69,48 @@ public class CompanionEntityPatch extends HumanoidMobPatch<CompanionEntity> {
             return;
         }
 
+        // Handle weapon holstering when not in combat (Epic Fight uses weapon on back)
+        updateWeaponHolstering();
+
         // Use ranged mob motion update - detects isUsingItem() for bow/crossbow animations
         super.commonAggressiveRangedMobUpdateMotion(considerInaction);
+    }
+
+    /**
+     * Updates weapon positioning based on combat state.
+     * When not in combat, moves weapons to the back.
+     * When in combat, moves weapons to hands.
+     */
+    private void updateWeaponHolstering() {
+        if (!ModConfig.get().isEnableWeaponHolstering()) {
+            return;
+        }
+
+        if (!(this.getArmature() instanceof ToolHolderArmature toolArmature)) {
+            return;
+        }
+
+        boolean inCombat = this.original.isAggressive();
+
+        if (!inCombat && !isWeaponOnBack()) {
+            // Move weapons to back when not in combat
+            this.setParentJointOfHand(InteractionHand.MAIN_HAND, toolArmature.backToolJoint());
+            this.setParentJointOfHand(InteractionHand.OFF_HAND, toolArmature.backToolJoint());
+        } else if (inCombat && isWeaponOnBack()) {
+            // Move weapons to hands when entering combat
+            this.setParentJointOfHand(InteractionHand.MAIN_HAND, toolArmature.rightToolJoint());
+            this.setParentJointOfHand(InteractionHand.OFF_HAND, toolArmature.leftToolJoint());
+        }
+    }
+
+    /**
+     * Checks if the main hand weapon is currently holstered on the back.
+     */
+    private boolean isWeaponOnBack() {
+        if (!(this.getArmature() instanceof ToolHolderArmature toolArmature)) {
+            return false;
+        }
+        return this.getParentJointOfHand(InteractionHand.MAIN_HAND) == toolArmature.backToolJoint();
     }
 
     @Override

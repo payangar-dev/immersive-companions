@@ -151,7 +151,7 @@ public class CompanionEntity extends PathfinderMob implements RangedAttackMob {
             // - Will strafe and shoot while in optimal range
             this.goalSelector.addGoal(1, new CompanionRangedAttackGoal(this, 1.0, 20, 15.0F, 6.0F));
         } else {
-            // Wrap melee goal to prevent attacking when critically injured
+            // Wrap melee goal to prevent attacking when critically injured and track combat state
             this.goalSelector.addGoal(1, new MeleeAttackGoal(this, 1.0, true) {
                 @Override
                 public boolean canUse() {
@@ -166,6 +166,16 @@ public class CompanionEntity extends PathfinderMob implements RangedAttackMob {
                         return false;
                     }
                     return super.canContinueToUse();
+                }
+                @Override
+                public void start() {
+                    super.start();
+                    CompanionEntity.this.setAggressive(true);
+                }
+                @Override
+                public void stop() {
+                    super.stop();
+                    CompanionEntity.this.setAggressive(false);
                 }
             });
         }

@@ -6,6 +6,8 @@ import net.minecraft.client.model.HumanoidModel;
 import net.minecraft.client.model.PlayerModel;
 import net.minecraft.client.model.geom.ModelLayers;
 import net.minecraft.client.renderer.MultiBufferSource;
+import com.payangar.immersivecompanions.client.renderer.layer.ConditionalItemInHandLayer;
+import com.payangar.immersivecompanions.platform.Services;
 import net.minecraft.client.renderer.entity.EntityRendererProvider;
 import net.minecraft.client.renderer.entity.HumanoidMobRenderer;
 import net.minecraft.client.renderer.entity.layers.HumanoidArmorLayer;
@@ -38,8 +40,13 @@ public class CompanionRenderer extends HumanoidMobRenderer<CompanionEntity, Play
                 new HumanoidModel<>(context.bakeLayer(ModelLayers.PLAYER_OUTER_ARMOR)),
                 context.getModelManager()));
 
-        // Add item in hand layer
-        this.addLayer(new ItemInHandLayer<>(this, context.getItemInHandRenderer()));
+        // When Epic Fight is loaded, keep the default ItemInHandLayer
+        // Epic Fight handles weapon holstering by moving items to back joint
+        // When Epic Fight is NOT loaded, use ConditionalItemInHandLayer to hide weapons when not in combat
+        if (!Services.get().isModLoaded("epicfight")) {
+            this.layers.removeIf(layer -> layer.getClass() == ItemInHandLayer.class);
+            this.addLayer(new ConditionalItemInHandLayer(this, context.getItemInHandRenderer()));
+        }
     }
 
     @Override

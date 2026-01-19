@@ -25,6 +25,7 @@ public class ModConfig {
     public static float criticalInjuryThreshold = 4.0f;
     public static float criticalInjurySpeedMultiplier = 0.5f;
     public static boolean enableMonstersTargetCompanions = true;
+    public static boolean enableWeaponHolstering = true;
 
     // Internal class for JSON serialization
     private static class ConfigData {
@@ -32,6 +33,7 @@ public class ModConfig {
         float criticalInjuryThreshold = 4.0f;
         float criticalInjurySpeedMultiplier = 0.5f;
         boolean enableMonstersTargetCompanions = true;
+        boolean enableWeaponHolstering = true;
     }
 
     /**
@@ -74,6 +76,14 @@ public class ModConfig {
     }
 
     /**
+     * Whether weapon holstering is enabled.
+     * When enabled, companions will display their weapons on their belt or back when not in combat.
+     */
+    public boolean isEnableWeaponHolstering() {
+        return enableWeaponHolstering;
+    }
+
+    /**
      * Loads the config from file, or creates default config if not found.
      * Should be called during mod initialization.
      */
@@ -89,6 +99,7 @@ public class ModConfig {
                     criticalInjuryThreshold = data.criticalInjuryThreshold;
                     criticalInjurySpeedMultiplier = data.criticalInjurySpeedMultiplier;
                     enableMonstersTargetCompanions = data.enableMonstersTargetCompanions;
+                    enableWeaponHolstering = data.enableWeaponHolstering;
                 }
                 ImmersiveCompanions.LOGGER.info("Loaded config from {}", configPath);
             } catch (IOException e) {
@@ -114,6 +125,7 @@ public class ModConfig {
             data.criticalInjuryThreshold = criticalInjuryThreshold;
             data.criticalInjurySpeedMultiplier = criticalInjurySpeedMultiplier;
             data.enableMonstersTargetCompanions = enableMonstersTargetCompanions;
+            data.enableWeaponHolstering = enableWeaponHolstering;
             String json = GSON.toJson(data);
             Files.writeString(configPath, json);
         } catch (IOException e) {

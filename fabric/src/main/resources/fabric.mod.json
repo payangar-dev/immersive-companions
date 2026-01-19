@@ -11,7 +11,8 @@
   "environment": "*",
   "entrypoints": {
     "main": ["com.payangar.immersivecompanions.ImmersiveCompanionsFabric"],
-    "client": ["com.payangar.immersivecompanions.client.ImmersiveCompanionsFabricClient"]
+    "client": ["com.payangar.immersivecompanions.client.ImmersiveCompanionsFabricClient"],
+    "modmenu": ["com.payangar.immersivecompanions.client.ModMenuIntegration"]
   },
   "depends": {
     "fabricloader": ">=${fabric_loader_version}",
@@ -20,7 +21,8 @@
     "fabric-api": "*"
   },
   "suggests": {
-    "yet-another-config-lib": "*"
+    "yet-another-config-lib": "*",
+    "modmenu": "*"
   },
   "mixins": [
     "immersivecompanions.mixins.json"

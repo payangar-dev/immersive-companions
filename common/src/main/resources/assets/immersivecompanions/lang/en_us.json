@@ -1,0 +1,10 @@
+{
+    "config.immersivecompanions.title": "Immersive Companions Config",
+    "config.immersivecompanions.category.gameplay": "Gameplay",
+    "config.immersivecompanions.enableCriticalInjury": "Enable Critical Injury",
+    "config.immersivecompanions.enableCriticalInjury.desc": "When enabled, companions enter a weakened state at low health (crouching, slow movement, cannot attack)",
+    "config.immersivecompanions.criticalInjuryThreshold": "Critical Injury Threshold",
+    "config.immersivecompanions.criticalInjuryThreshold.desc": "Health threshold (in half-hearts) at which companions become critically injured. Default: 4 (2 hearts)",
+    "config.immersivecompanions.criticalInjurySpeedMultiplier": "Injured Speed Multiplier",
+    "config.immersivecompanions.criticalInjurySpeedMultiplier.desc": "Movement speed multiplier when critically injured. 0.5 = 50% speed. Default: 0.5"
+}

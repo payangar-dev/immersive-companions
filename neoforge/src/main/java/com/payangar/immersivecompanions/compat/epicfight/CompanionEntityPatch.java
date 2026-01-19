@@ -1,5 +1,6 @@
 package com.payangar.immersivecompanions.compat.epicfight;
 
+import com.payangar.immersivecompanions.config.ModConfig;
 import com.payangar.immersivecompanions.entity.CompanionEntity;
 import yesman.epicfight.api.animation.Animator;
 import yesman.epicfight.api.animation.LivingMotions;
@@ -34,6 +35,10 @@ public class CompanionEntityPatch extends HumanoidMobPatch<CompanionEntity> {
         animator.addLivingAnimation(LivingMotions.MOUNT, Animations.BIPED_MOUNT);
         animator.addLivingAnimation(LivingMotions.DEATH, Animations.BIPED_DEATH);
 
+        // Critical injury animations (when health <= 2 hearts)
+        animator.addLivingAnimation(LivingMotions.KNEEL, Animations.BIPED_KNEEL);
+        animator.addLivingAnimation(LivingMotions.SNEAK, Animations.BIPED_SNEAK);
+
         // Ranged combat animations (bow)
         animator.addLivingAnimation(LivingMotions.AIM, Animations.BIPED_BOW_AIM);
         animator.addLivingAnimation(LivingMotions.SHOT, Animations.BIPED_BOW_SHOT);
@@ -44,6 +49,22 @@ public class CompanionEntityPatch extends HumanoidMobPatch<CompanionEntity> {
 
     @Override
     public void updateMotion(boolean considerInaction) {
+        // Let death animation play normally
+        if (this.original.isDeadOrDying()) {
+            this.currentLivingMotion = LivingMotions.DEATH;
+            return;
+        }
+
+        // Check for critical injury state (if enabled)
+        if (ModConfig.get().isEnableCriticalInjury() && this.original.isCriticallyInjured()) {
+            // Use SNEAK animation when moving, KNEEL when stationary
+            if (this.original.walkAnimation.speed() > 0.01F) {
+                this.currentLivingMotion = LivingMotions.SNEAK;
+            } else {
+                this.currentLivingMotion = LivingMotions.KNEEL;
+            }
+            return;
+        }
         // Use ranged mob motion update - detects isUsingItem() for bow/crossbow animations
         super.commonAggressiveRangedMobUpdateMotion(considerInaction);
     }

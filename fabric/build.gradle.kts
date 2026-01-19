@@ -16,6 +16,19 @@ val fabric_loader_version: String by project
 val fabric_api_version: String by project
 val parchment_minecraft_version: String by project
 val parchment_version: String by project
+val yacl_version: String by project
+val modmenu_version: String by project
+
+repositories {
+    maven {
+        name = "Terraformers"
+        url = uri("https://maven.terraformersmc.com/releases")
+    }
+    maven {
+        name = "YACL"
+        url = uri("https://maven.isxander.dev/releases")
+    }
+}
 
 dependencies {
     minecraft("com.mojang:minecraft:$minecraft_version")
@@ -26,6 +39,10 @@ dependencies {
 
     modImplementation("net.fabricmc:fabric-loader:$fabric_loader_version")
     modImplementation("net.fabricmc.fabric-api:fabric-api:$fabric_api_version")
+
+    // Config GUI
+    modImplementation("dev.isxander:yet-another-config-lib:${yacl_version}-fabric")
+    modImplementation("com.terraformersmc:modmenu:${modmenu_version}")
 
     implementation(project(":common"))
 }

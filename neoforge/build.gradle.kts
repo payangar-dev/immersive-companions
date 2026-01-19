@@ -15,11 +15,16 @@ val minecraft_version: String by project
 val neoforge_version: String by project
 val parchment_minecraft_version: String by project
 val parchment_version: String by project
+val yacl_version: String by project
 
 repositories {
     maven {
         name = "Modrinth"
         url = uri("https://api.modrinth.com/maven")
+    }
+    maven {
+        name = "YACL"
+        url = uri("https://maven.isxander.dev/releases")
     }
 }
 
@@ -59,6 +64,9 @@ neoForge {
 dependencies {
     implementation(project(":common"))
     compileOnly("maven.modrinth:epic-fight:21.14.4-mc1.21.1-neoforge")
+
+    // Config GUI
+    implementation("dev.isxander:yet-another-config-lib:${yacl_version}-neoforge")
 }
 
 tasks.jar {

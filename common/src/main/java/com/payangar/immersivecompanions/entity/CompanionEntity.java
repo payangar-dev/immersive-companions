@@ -1,5 +1,6 @@
 package com.payangar.immersivecompanions.entity;
 
+import com.payangar.immersivecompanions.config.ModConfig;
 import com.payangar.immersivecompanions.data.CompanionEquipment;
 import com.payangar.immersivecompanions.data.CompanionNames;
 import com.payangar.immersivecompanions.data.CompanionSkins;
@@ -15,6 +16,8 @@ import net.minecraft.sounds.SoundEvents;
 import net.minecraft.world.DifficultyInstance;
 import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.entity.*;
+import net.minecraft.world.entity.ai.attributes.AttributeInstance;
+import net.minecraft.world.entity.ai.attributes.AttributeModifier;
 import net.minecraft.world.entity.ai.attributes.AttributeSupplier;
 import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.entity.ai.goal.*;
@@ -52,11 +55,17 @@ public class CompanionEntity extends PathfinderMob implements RangedAttackMob {
             CompanionEntity.class, EntityDataSerializers.BOOLEAN);
     private static final EntityDataAccessor<String> DATA_TEAM = SynchedEntityData.defineId(
             CompanionEntity.class, EntityDataSerializers.STRING);
+    private static final EntityDataAccessor<Boolean> DATA_CRITICALLY_INJURED = SynchedEntityData.defineId(
+            CompanionEntity.class, EntityDataSerializers.BOOLEAN);
 
     private static final int MAX_SKIN_VARIANTS = 10;
 
     /** Default team for village-spawned companions */
     public static final String DEFAULT_TEAM = "village_guard";
+
+    /** Movement speed modifier ID for critical injury state */
+    private static final ResourceLocation CRITICAL_INJURY_SPEED_ID = ResourceLocation.fromNamespaceAndPath(
+            "immersivecompanions", "critical_injury_slowdown");
 
     public CompanionEntity(EntityType<? extends CompanionEntity> entityType, Level level) {
         super(entityType, level);
@@ -85,6 +94,7 @@ public class CompanionEntity extends PathfinderMob implements RangedAttackMob {
         builder.define(DATA_SKIN_INDEX, 0);
         builder.define(DATA_CHARGING, false);
         builder.define(DATA_TEAM, DEFAULT_TEAM);
+        builder.define(DATA_CRITICALLY_INJURED, false);
     }
 
     @Override
@@ -138,7 +148,23 @@ public class CompanionEntity extends PathfinderMob implements RangedAttackMob {
             // - Will strafe and shoot while in optimal range
             this.goalSelector.addGoal(1, new CompanionRangedAttackGoal(this, 1.0, 20, 15.0F, 6.0F));
         } else {
-            this.goalSelector.addGoal(1, new MeleeAttackGoal(this, 1.0, true));
+            // Wrap melee goal to prevent attacking when critically injured
+            this.goalSelector.addGoal(1, new MeleeAttackGoal(this, 1.0, true) {
+                @Override
+                public boolean canUse() {
+                    if (ModConfig.get().isEnableCriticalInjury() && CompanionEntity.this.isCriticallyInjured()) {
+                        return false;
+                    }
+                    return super.canUse();
+                }
+                @Override
+                public boolean canContinueToUse() {
+                    if (ModConfig.get().isEnableCriticalInjury() && CompanionEntity.this.isCriticallyInjured()) {
+                        return false;
+                    }
+                    return super.canContinueToUse();
+                }
+            });
         }
     }
 
@@ -234,6 +260,27 @@ public class CompanionEntity extends PathfinderMob implements RangedAttackMob {
         return false;
     }
 
+    public boolean isCriticallyInjured() {
+        return this.entityData.get(DATA_CRITICALLY_INJURED);
+    }
+
+    public void setCriticallyInjured(boolean injured) {
+        this.entityData.set(DATA_CRITICALLY_INJURED, injured);
+
+        // Apply or remove movement speed penalty
+        AttributeInstance speedAttr = this.getAttribute(Attributes.MOVEMENT_SPEED);
+        if (speedAttr != null) {
+            speedAttr.removeModifier(CRITICAL_INJURY_SPEED_ID);
+            if (injured) {
+                // Create modifier based on config (e.g., 0.5 multiplier = -0.5 penalty)
+                double speedPenalty = -(1.0 - ModConfig.get().getCriticalInjurySpeedMultiplier());
+                AttributeModifier modifier = new AttributeModifier(
+                        CRITICAL_INJURY_SPEED_ID, speedPenalty, AttributeModifier.Operation.ADD_MULTIPLIED_TOTAL);
+                speedAttr.addTransientModifier(modifier);
+            }
+        }
+    }
+
     public ResourceLocation getSkinTexture() {
         return CompanionSkins.getSkin(getGender(), getSkinIndex());
     }
@@ -246,6 +293,7 @@ public class CompanionEntity extends PathfinderMob implements RangedAttackMob {
         tag.putInt("CombatType", getCombatType().ordinal());
         tag.putInt("SkinIndex", getSkinIndex());
         tag.putString("Team", getCompanionTeam());
+        tag.putBoolean("CriticallyInjured", isCriticallyInjured());
     }
 
     @Override
@@ -263,6 +311,9 @@ public class CompanionEntity extends PathfinderMob implements RangedAttackMob {
         }
         if (tag.contains("Team")) {
             setCompanionTeam(tag.getString("Team"));
+        }
+        if (tag.contains("CriticallyInjured")) {
+            setCriticallyInjured(tag.getBoolean("CriticallyInjured"));
         }
     }
 
@@ -317,6 +368,13 @@ public class CompanionEntity extends PathfinderMob implements RangedAttackMob {
             spreadNegativeGossip(player);
         }
 
+        // Check for critical injury (health at or below threshold)
+        if (hurt && !this.level().isClientSide && ModConfig.get().isEnableCriticalInjury()
+                && this.getHealth() <= ModConfig.get().getCriticalInjuryThreshold()
+                && !this.isCriticallyInjured()) {
+            setCriticallyInjured(true);
+        }
+
         return hurt;
     }
 
@@ -332,6 +390,48 @@ public class CompanionEntity extends PathfinderMob implements RangedAttackMob {
             villager.getGossips().add(player.getUUID(),
                     net.minecraft.world.entity.ai.gossip.GossipType.MINOR_NEGATIVE, 25);
         }
+    }
+
+    @Override
+    public void heal(float amount) {
+        super.heal(amount);
+        // Exit critical injury state when health recovers above threshold
+        if (!this.level().isClientSide && this.isCriticallyInjured()
+                && this.getHealth() > ModConfig.get().getCriticalInjuryThreshold()) {
+            setCriticallyInjured(false);
+        }
+    }
+
+    @Override
+    public void tick() {
+        super.tick();
+        // Periodic health check for edge cases (regen effects, commands, etc.)
+        if (!this.level().isClientSide && this.tickCount % 10 == 0 && ModConfig.get().isEnableCriticalInjury()) {
+            boolean shouldBeInjured = this.getHealth() <= ModConfig.get().getCriticalInjuryThreshold();
+            if (this.isCriticallyInjured() != shouldBeInjured) {
+                setCriticallyInjured(shouldBeInjured);
+            }
+        }
+    }
+
+    @Override
+    public void setPose(Pose pose) {
+        // Force crouching when critically injured (except for dying/sleeping)
+        if (ModConfig.get().isEnableCriticalInjury() && this.isCriticallyInjured()
+                && pose != Pose.DYING && pose != Pose.SLEEPING) {
+            super.setPose(Pose.CROUCHING);
+        } else {
+            super.setPose(pose);
+        }
+    }
+
+    @Override
+    public void jumpFromGround() {
+        // Disable jumping when critically injured
+        if (ModConfig.get().isEnableCriticalInjury() && this.isCriticallyInjured()) {
+            return;
+        }
+        super.jumpFromGround();
     }
 
     // Check if this entity can use ranged weapons

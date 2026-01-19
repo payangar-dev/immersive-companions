@@ -1,5 +1,6 @@
 package com.payangar.immersivecompanions;
 
+import com.payangar.immersivecompanions.config.ModConfig;
 import com.payangar.immersivecompanions.platform.Services;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -11,5 +12,8 @@ public class ImmersiveCompanions {
 
     public static void init() {
         LOGGER.info("Initializing {} on {}", MOD_NAME, Services.get().getLoaderName());
+
+        // Load configuration
+        ModConfig.load();
     }
 }

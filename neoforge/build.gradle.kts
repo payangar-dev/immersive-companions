@@ -2,6 +2,10 @@ plugins {
     id("net.neoforged.moddev") version "2.0.95"
 }
 
+base {
+    archivesName.set("${project.property("mod_id")}-neoforge")
+}
+
 val mod_id: String by project
 val mod_name: String by project
 val mod_version: String by project

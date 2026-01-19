@@ -2,6 +2,10 @@ plugins {
     id("fabric-loom") version "1.11-SNAPSHOT"
 }
 
+base {
+    archivesName.set("${project.property("mod_id")}-fabric")
+}
+
 val mod_id: String by project
 val mod_name: String by project
 val mod_version: String by project

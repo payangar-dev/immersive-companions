@@ -4,7 +4,8 @@
   "package": "com.payangar.immersivecompanions.mixin",
   "compatibilityLevel": "JAVA_21",
   "mixins": [
-    "VillageStructureMixin"
+    "VillageStructureMixin",
+    "MobAccessor"
   ],
   "client": [],
   "injectors": {

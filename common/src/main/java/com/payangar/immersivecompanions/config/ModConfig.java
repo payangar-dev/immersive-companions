@@ -24,12 +24,14 @@ public class ModConfig {
     public static boolean enableCriticalInjury = true;
     public static float criticalInjuryThreshold = 4.0f;
     public static float criticalInjurySpeedMultiplier = 0.5f;
+    public static boolean enableMonstersTargetCompanions = true;
 
     // Internal class for JSON serialization
     private static class ConfigData {
         boolean enableCriticalInjury = true;
         float criticalInjuryThreshold = 4.0f;
         float criticalInjurySpeedMultiplier = 0.5f;
+        boolean enableMonstersTargetCompanions = true;
     }
 
     /**
@@ -64,6 +66,14 @@ public class ModConfig {
     }
 
     /**
+     * Whether monsters should proactively target companions.
+     * When enabled, hostile mobs (except creepers and endermen) will attack companions on sight.
+     */
+    public boolean isEnableMonstersTargetCompanions() {
+        return enableMonstersTargetCompanions;
+    }
+
+    /**
      * Loads the config from file, or creates default config if not found.
      * Should be called during mod initialization.
      */
@@ -78,6 +88,7 @@ public class ModConfig {
                     enableCriticalInjury = data.enableCriticalInjury;
                     criticalInjuryThreshold = data.criticalInjuryThreshold;
                     criticalInjurySpeedMultiplier = data.criticalInjurySpeedMultiplier;
+                    enableMonstersTargetCompanions = data.enableMonstersTargetCompanions;
                 }
                 ImmersiveCompanions.LOGGER.info("Loaded config from {}", configPath);
             } catch (IOException e) {
@@ -102,6 +113,7 @@ public class ModConfig {
             data.enableCriticalInjury = enableCriticalInjury;
             data.criticalInjuryThreshold = criticalInjuryThreshold;
             data.criticalInjurySpeedMultiplier = criticalInjurySpeedMultiplier;
+            data.enableMonstersTargetCompanions = enableMonstersTargetCompanions;
             String json = GSON.toJson(data);
             Files.writeString(configPath, json);
         } catch (IOException e) {

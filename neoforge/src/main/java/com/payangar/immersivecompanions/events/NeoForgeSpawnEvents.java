@@ -1,19 +1,24 @@
 package com.payangar.immersivecompanions.events;
 
 import com.payangar.immersivecompanions.ImmersiveCompanions;
+import com.payangar.immersivecompanions.config.ModConfig;
+import com.payangar.immersivecompanions.entity.CompanionEntity;
 import com.payangar.immersivecompanions.spawning.CompanionSpawnLogic;
 import it.unimi.dsi.fastutil.longs.LongSet;
 import net.minecraft.core.BlockPos;
-import net.minecraft.core.SectionPos;
 import net.minecraft.core.registries.Registries;
-import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.entity.ai.goal.target.NearestAttackableTargetGoal;
+import net.minecraft.world.entity.monster.Creeper;
+import net.minecraft.world.entity.monster.EnderMan;
+import net.minecraft.world.entity.monster.Monster;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.chunk.LevelChunk;
 import net.minecraft.world.level.levelgen.structure.Structure;
 import net.minecraft.world.level.levelgen.structure.StructureStart;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
+import net.neoforged.neoforge.event.entity.EntityJoinLevelEvent;
 import net.neoforged.neoforge.event.level.ChunkEvent;
 import net.neoforged.neoforge.event.server.ServerStoppedEvent;
 
@@ -95,5 +100,31 @@ public class NeoForgeSpawnEvents {
     @SubscribeEvent
     public static void onServerStopped(ServerStoppedEvent event) {
         CompanionSpawnLogic.clearTrackedChunks();
+    }
+
+    /**
+     * Injects companion targeting goal into monsters when they join the world.
+     * Excludes Creepers and Endermen.
+     */
+    @SubscribeEvent
+    public static void onEntityJoinLevel(EntityJoinLevelEvent event) {
+        if (!ModConfig.get().isEnableMonstersTargetCompanions()) {
+            return;
+        }
+
+        if (event.getLevel().isClientSide()) {
+            return;
+        }
+
+        if (event.getEntity() instanceof Monster monster) {
+            // Exclude Creepers and Endermen
+            if (monster instanceof Creeper || monster instanceof EnderMan) {
+                return;
+            }
+
+            // Add goal to target companions with lower priority than player targeting
+            monster.targetSelector.addGoal(3, new NearestAttackableTargetGoal<>(
+                    monster, CompanionEntity.class, true));
+        }
     }
 }

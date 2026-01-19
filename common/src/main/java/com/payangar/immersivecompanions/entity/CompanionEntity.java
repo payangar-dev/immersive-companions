@@ -67,6 +67,9 @@ public class CompanionEntity extends PathfinderMob implements RangedAttackMob {
     private static final ResourceLocation CRITICAL_INJURY_SPEED_ID = ResourceLocation.fromNamespaceAndPath(
             "immersivecompanions", "critical_injury_slowdown");
 
+    /** Callback for post-ranged-attack events (used by Epic Fight compat for shooting animation) */
+    private Runnable onRangedAttackCallback = null;
+
     public CompanionEntity(EntityType<? extends CompanionEntity> entityType, Level level) {
         super(entityType, level);
         setPersistenceRequired();
@@ -317,6 +320,14 @@ public class CompanionEntity extends PathfinderMob implements RangedAttackMob {
         }
     }
 
+    /**
+     * Sets a callback to be invoked after performing a ranged attack.
+     * Used by Epic Fight compat to trigger shooting animations.
+     */
+    public void setOnRangedAttackCallback(Runnable callback) {
+        this.onRangedAttackCallback = callback;
+    }
+
     // Ranged attack implementation
     @Override
     public void performRangedAttack(LivingEntity target, float distanceFactor) {
@@ -326,6 +337,11 @@ public class CompanionEntity extends PathfinderMob implements RangedAttackMob {
             performCrossbowAttack(target);
         } else {
             performBowAttack(target, distanceFactor);
+        }
+
+        // Notify listeners (e.g., Epic Fight for shooting animation)
+        if (onRangedAttackCallback != null) {
+            onRangedAttackCallback.run();
         }
     }
 

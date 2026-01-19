@@ -16,11 +16,16 @@ import yesman.epicfight.world.entity.ai.goal.TargetChasingGoal;
  * Extends HumanoidMobPatch to provide humanoid combat animations for companions.
  * This enables companions to use Epic Fight's biped animations for combat,
  * walking, idle, and other actions. Supports both melee and ranged combat.
+ * Ranged weapon animations (bow/crossbow) come from the weapon capability system.
  */
 public class CompanionEntityPatch extends HumanoidMobPatch<CompanionEntity> {
 
     public CompanionEntityPatch(CompanionEntity original) {
         super(original, Factions.VILLAGER);  // Allies with villagers, hostile to undead
+
+        // Set up callback to trigger shooting animation after ranged attacks
+        // This replaces what Epic Fight's mixins do for vanilla RangedAttackGoal
+        original.setOnRangedAttackCallback(this::playShootingAnimation);
     }
 
     @Override
@@ -39,12 +44,8 @@ public class CompanionEntityPatch extends HumanoidMobPatch<CompanionEntity> {
         animator.addLivingAnimation(LivingMotions.KNEEL, Animations.BIPED_KNEEL);
         animator.addLivingAnimation(LivingMotions.SNEAK, Animations.BIPED_SNEAK);
 
-        // Ranged combat animations (bow)
-        animator.addLivingAnimation(LivingMotions.AIM, Animations.BIPED_BOW_AIM);
-        animator.addLivingAnimation(LivingMotions.SHOT, Animations.BIPED_BOW_SHOT);
-
-        // Crossbow animations
-        animator.addLivingAnimation(LivingMotions.RELOAD, Animations.BIPED_CROSSBOW_RELOAD);
+        // Note: Ranged animations (AIM, SHOT, RELOAD) come from weapon capabilities
+        // via modifyLivingMotionByCurrentItem() inherited from HumanoidMobPatch
     }
 
     @Override
@@ -65,6 +66,7 @@ public class CompanionEntityPatch extends HumanoidMobPatch<CompanionEntity> {
             }
             return;
         }
+
         // Use ranged mob motion update - detects isUsingItem() for bow/crossbow animations
         super.commonAggressiveRangedMobUpdateMotion(considerInaction);
     }

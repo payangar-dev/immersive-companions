@@ -142,10 +142,10 @@ public class CompanionRangedAttackGoal extends Goal {
             companion.getNavigation().moveTo(target, speedModifier);
             resetChargingState();
         } else if (tooClose) {
-            // Retreat! Target is too close - move backwards
-            retreatFromTarget(target);
-            // Can still shoot while retreating if we have line of sight
+            // Retreat! Target is too close - move backwards while facing target
+            // Set look direction first, then use strafe to move backwards without turning
             companion.getLookControl().setLookAt(target, 30.0F, 30.0F);
+            companion.getMoveControl().strafe(-1.0F * (float) speedModifier * 1.2F, 0.0F);
         } else {
             // In optimal range - strafe while attacking
             companion.getNavigation().stop();
@@ -316,24 +316,6 @@ public class CompanionRangedAttackGoal extends Goal {
         // Check if within corridor (accounting for entity size)
         double entityRadius = Math.max(entity.getBbWidth(), entity.getBbHeight()) / 2;
         return perpendicularDist < (corridor + entityRadius);
-    }
-
-    /**
-     * Moves the companion away from the target to maintain safe distance.
-     */
-    private void retreatFromTarget(LivingEntity target) {
-        Vec3 companionPos = companion.position();
-        Vec3 targetPos = target.position();
-
-        // Calculate direction away from target
-        Vec3 retreatDir = companionPos.subtract(targetPos).normalize();
-
-        // Calculate retreat position (move back toward optimal range)
-        double retreatDistance = minAttackRadius + 2.0; // Move slightly past minimum
-        Vec3 retreatPos = companionPos.add(retreatDir.scale(retreatDistance));
-
-        // Move to retreat position with slightly increased speed for urgency
-        companion.getNavigation().moveTo(retreatPos.x, retreatPos.y, retreatPos.z, speedModifier * 1.2);
     }
 
     /**

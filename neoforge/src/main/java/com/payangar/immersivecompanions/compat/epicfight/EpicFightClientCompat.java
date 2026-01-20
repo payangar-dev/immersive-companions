@@ -3,9 +3,7 @@ package com.payangar.immersivecompanions.compat.epicfight;
 import com.payangar.immersivecompanions.ImmersiveCompanions;
 import com.payangar.immersivecompanions.registry.NeoForgeEntityRegistration;
 import net.neoforged.bus.api.IEventBus;
-import yesman.epicfight.api.client.model.Meshes;
 import yesman.epicfight.api.client.neoevent.PatchedRenderersEvent;
-import yesman.epicfight.client.renderer.patched.entity.PCustomHumanoidEntityRenderer;
 
 /**
  * Client-side Epic Fight compatibility.
@@ -34,7 +32,7 @@ public class EpicFightClientCompat {
     private static void registerPatchedRenderer(PatchedRenderersEvent.Add event) {
         event.addPatchedEntityRenderer(
             NeoForgeEntityRegistration.COMPANION.get(),
-            entityType -> new PCustomHumanoidEntityRenderer<>(Meshes.BIPED, event.getContext(), entityType)
+            entityType -> new PCompanionRenderer(event.getContext(), entityType)
         );
         ImmersiveCompanions.LOGGER.debug("Registered CompanionEntity patched renderer with Epic Fight");
     }

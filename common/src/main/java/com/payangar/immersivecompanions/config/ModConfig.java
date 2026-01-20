@@ -26,6 +26,8 @@ public class ModConfig {
     public static float criticalInjurySpeedMultiplier = 0.5f;
     public static boolean enableMonstersTargetCompanions = true;
     public static boolean enableWeaponHolstering = true;
+    public static boolean enableTeamCoordination = true;
+    public static float teamCoordinationRange = 16.0f;
 
     // Internal class for JSON serialization
     private static class ConfigData {
@@ -34,6 +36,8 @@ public class ModConfig {
         float criticalInjurySpeedMultiplier = 0.5f;
         boolean enableMonstersTargetCompanions = true;
         boolean enableWeaponHolstering = true;
+        boolean enableTeamCoordination = true;
+        float teamCoordinationRange = 16.0f;
     }
 
     /**
@@ -84,6 +88,22 @@ public class ModConfig {
     }
 
     /**
+     * Whether team coordination is enabled.
+     * When enabled, companions will defend teammates being attacked and assist teammates in combat.
+     */
+    public boolean isEnableTeamCoordination() {
+        return enableTeamCoordination;
+    }
+
+    /**
+     * Detection range for team coordination in blocks.
+     * Default is 16.0 blocks.
+     */
+    public float getTeamCoordinationRange() {
+        return teamCoordinationRange;
+    }
+
+    /**
      * Loads the config from file, or creates default config if not found.
      * Should be called during mod initialization.
      */
@@ -100,6 +120,8 @@ public class ModConfig {
                     criticalInjurySpeedMultiplier = data.criticalInjurySpeedMultiplier;
                     enableMonstersTargetCompanions = data.enableMonstersTargetCompanions;
                     enableWeaponHolstering = data.enableWeaponHolstering;
+                    enableTeamCoordination = data.enableTeamCoordination;
+                    teamCoordinationRange = data.teamCoordinationRange;
                 }
                 ImmersiveCompanions.LOGGER.info("Loaded config from {}", configPath);
             } catch (IOException e) {
@@ -126,6 +148,8 @@ public class ModConfig {
             data.criticalInjurySpeedMultiplier = criticalInjurySpeedMultiplier;
             data.enableMonstersTargetCompanions = enableMonstersTargetCompanions;
             data.enableWeaponHolstering = enableWeaponHolstering;
+            data.enableTeamCoordination = enableTeamCoordination;
+            data.teamCoordinationRange = teamCoordinationRange;
             String json = GSON.toJson(data);
             Files.writeString(configPath, json);
         } catch (IOException e) {

@@ -7,6 +7,7 @@ import com.payangar.immersivecompanions.data.CompanionSkins;
 import com.payangar.immersivecompanions.data.SkinInfo;
 import com.payangar.immersivecompanions.entity.ai.CompanionDefendVillageGoal;
 import com.payangar.immersivecompanions.entity.ai.CompanionRangedAttackGoal;
+import com.payangar.immersivecompanions.entity.ai.CompanionTeamCoordinationGoal;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.syncher.EntityDataAccessor;
 import net.minecraft.network.syncher.EntityDataSerializers;
@@ -132,12 +133,15 @@ public class CompanionEntity extends PathfinderMob implements RangedAttackMob {
             }
         });
 
-        // Priority 3: Attack monsters (filtered)
-        this.targetSelector.addGoal(3, new NearestAttackableTargetGoal<>(this, Monster.class, 10, true, false,
+        // Priority 3: Team coordination (defend and assist teammates)
+        this.targetSelector.addGoal(3, new CompanionTeamCoordinationGoal(this));
+
+        // Priority 4: Attack monsters (filtered)
+        this.targetSelector.addGoal(4, new NearestAttackableTargetGoal<>(this, Monster.class, 10, true, false,
                 this::shouldAttackEntity));
 
-        // Priority 4: Village defense
-        this.targetSelector.addGoal(4, new CompanionDefendVillageGoal(this));
+        // Priority 5: Village defense
+        this.targetSelector.addGoal(5, new CompanionDefendVillageGoal(this));
     }
 
     private void registerCombatGoals() {

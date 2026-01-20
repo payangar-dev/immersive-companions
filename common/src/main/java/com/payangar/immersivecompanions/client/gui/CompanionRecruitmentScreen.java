@@ -57,6 +57,10 @@ public class CompanionRecruitmentScreen extends Screen {
     private int leftPos;
     private int topPos;
 
+    // Button references for manual rendering (Epic Fight pattern)
+    private Button denyButton;
+    private Button recruitButton;
+
     public CompanionRecruitmentScreen(CompanionEntity companion, int basePrice, int finalPrice) {
         super(Component.translatable("gui.immersivecompanions.recruitment.title"));
         this.companion = companion;
@@ -84,19 +88,18 @@ public class CompanionRecruitmentScreen extends Screen {
 
         // Deny button (left)
         int denyX = leftPos + (GUI_WIDTH / 2) - buttonWidth - (buttonGap / 2);
-        this.addRenderableWidget(Button.builder(
+        this.denyButton = this.addRenderableWidget(Button.builder(
                 Component.translatable("gui.immersivecompanions.recruitment.deny"),
                 button -> this.onClose()
         ).bounds(denyX, buttonY, buttonWidth, buttonHeight).build());
 
         // Recruit button (right) - disabled if can't afford
         int recruitX = leftPos + (GUI_WIDTH / 2) + (buttonGap / 2);
-        Button recruitButton = Button.builder(
+        this.recruitButton = this.addRenderableWidget(Button.builder(
                 Component.translatable("gui.immersivecompanions.recruitment.recruit"),
                 button -> onRecruit()
-        ).bounds(recruitX, buttonY, buttonWidth, buttonHeight).build();
-        recruitButton.active = canAfford;
-        this.addRenderableWidget(recruitButton);
+        ).bounds(recruitX, buttonY, buttonWidth, buttonHeight).build());
+        this.recruitButton.active = canAfford;
     }
 
     private void onRecruit() {
@@ -130,8 +133,9 @@ public class CompanionRecruitmentScreen extends Screen {
         int priceY = topPos + 55;
         renderPriceSection(graphics, priceY);
 
-        // Render widgets (buttons)
-        super.render(graphics, mouseX, mouseY, partialTick);
+        // Render widgets MANUALLY (Epic Fight pattern - avoids super.render() re-rendering background)
+        this.denyButton.render(graphics, mouseX, mouseY, partialTick);
+        this.recruitButton.render(graphics, mouseX, mouseY, partialTick);
     }
 
     private void renderCompanionFace(GuiGraphics graphics, int x, int y) {
@@ -163,7 +167,7 @@ public class CompanionRecruitmentScreen extends Screen {
             renderPriceWithEmerald(graphics, priceX, finalY, finalPrice, finalColor);
         } else {
             // No modifier - show price normally
-            int color = canAfford ? TEXT_COLOR_DISCOUNT : TEXT_COLOR_MARKUP;
+            int color = canAfford ? TEXT_COLOR_NORMAL : TEXT_COLOR_MARKUP;
             renderPriceWithEmerald(graphics, priceX, y, finalPrice, color);
         }
     }

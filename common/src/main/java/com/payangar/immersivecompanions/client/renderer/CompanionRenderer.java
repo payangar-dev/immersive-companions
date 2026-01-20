@@ -1,6 +1,7 @@
 package com.payangar.immersivecompanions.client.renderer;
 
 import com.mojang.blaze3d.vertex.PoseStack;
+import com.payangar.immersivecompanions.data.SkinInfo;
 import com.payangar.immersivecompanions.entity.CompanionEntity;
 import net.minecraft.client.model.HumanoidModel;
 import net.minecraft.client.model.PlayerModel;
@@ -52,8 +53,9 @@ public class CompanionRenderer extends HumanoidMobRenderer<CompanionEntity, Play
     @Override
     public void render(CompanionEntity entity, float entityYaw, float partialTicks,
                        PoseStack poseStack, MultiBufferSource buffer, int packedLight) {
-        // Swap model based on gender
-        this.model = entity.getGender().isSlim() ? slimModel : normalModel;
+        // Swap model based on skin info (respects _slim/_wide suffix or folder default)
+        SkinInfo skinInfo = entity.getSkinInfo();
+        this.model = skinInfo.slim() ? slimModel : normalModel;
 
         // Set arm pose based on charging state
         setModelArmPose(entity);

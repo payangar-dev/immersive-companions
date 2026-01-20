@@ -4,6 +4,7 @@ import com.payangar.immersivecompanions.config.ModConfig;
 import com.payangar.immersivecompanions.data.CompanionEquipment;
 import com.payangar.immersivecompanions.data.CompanionNames;
 import com.payangar.immersivecompanions.data.CompanionSkins;
+import com.payangar.immersivecompanions.data.SkinInfo;
 import com.payangar.immersivecompanions.entity.ai.CompanionDefendVillageGoal;
 import com.payangar.immersivecompanions.entity.ai.CompanionRangedAttackGoal;
 import net.minecraft.nbt.CompoundTag;
@@ -57,8 +58,6 @@ public class CompanionEntity extends PathfinderMob implements RangedAttackMob {
             CompanionEntity.class, EntityDataSerializers.STRING);
     private static final EntityDataAccessor<Boolean> DATA_CRITICALLY_INJURED = SynchedEntityData.defineId(
             CompanionEntity.class, EntityDataSerializers.BOOLEAN);
-
-    private static final int MAX_SKIN_VARIANTS = 10;
 
     /** Default team for village-spawned companions */
     public static final String DEFAULT_TEAM = "village_guard";
@@ -198,7 +197,7 @@ public class CompanionEntity extends PathfinderMob implements RangedAttackMob {
         // Randomize appearance
         CompanionGender gender = CompanionGender.random(level.getRandom());
         CompanionType combatType = CompanionType.random(level.getRandom());
-        int skinIndex = level.getRandom().nextInt(MAX_SKIN_VARIANTS);
+        int skinIndex = level.getRandom().nextInt(CompanionSkins.getSkinCount(gender));
 
         setGender(gender);
         setCombatType(combatType);
@@ -296,6 +295,14 @@ public class CompanionEntity extends PathfinderMob implements RangedAttackMob {
 
     public ResourceLocation getSkinTexture() {
         return CompanionSkins.getSkin(getGender(), getSkinIndex());
+    }
+
+    /**
+     * Gets the skin info for this companion, including texture and slim/wide model status.
+     * Used by the renderer to determine which model variant to use.
+     */
+    public SkinInfo getSkinInfo() {
+        return CompanionSkins.getSkinInfo(getGender(), getSkinIndex());
     }
 
     // NBT persistence

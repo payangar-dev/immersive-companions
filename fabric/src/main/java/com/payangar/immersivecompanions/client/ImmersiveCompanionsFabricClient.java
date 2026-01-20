@@ -3,6 +3,7 @@ package com.payangar.immersivecompanions.client;
 import com.payangar.immersivecompanions.ImmersiveCompanions;
 import com.payangar.immersivecompanions.client.renderer.CompanionRenderer;
 import com.payangar.immersivecompanions.data.CompanionSkins;
+import com.payangar.immersivecompanions.network.FabricNetworking;
 import com.payangar.immersivecompanions.registry.FabricEntityRegistration;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.api.EnvType;
@@ -25,6 +26,9 @@ public class ImmersiveCompanionsFabricClient implements ClientModInitializer {
     public void onInitializeClient() {
         // Register entity renderers
         EntityRendererRegistry.register(FabricEntityRegistration.getCompanionEntityType(), CompanionRenderer::new);
+
+        // Register networking client handlers
+        FabricNetworking.registerClientHandlers();
 
         // Register resource reload listener for skin discovery
         ResourceManagerHelper.get(PackType.CLIENT_RESOURCES).registerReloadListener(

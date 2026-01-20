@@ -3,6 +3,7 @@ package com.payangar.immersivecompanions;
 import com.payangar.immersivecompanions.config.ModConfig;
 import com.payangar.immersivecompanions.entity.CompanionEntity;
 import com.payangar.immersivecompanions.mixin.MobAccessor;
+import com.payangar.immersivecompanions.network.FabricNetworking;
 import com.payangar.immersivecompanions.platform.FabricServices;
 import com.payangar.immersivecompanions.platform.Services;
 import com.payangar.immersivecompanions.registry.FabricEntityRegistration;
@@ -22,6 +23,9 @@ public class ImmersiveCompanionsFabric implements ModInitializer {
 
         // Register entities
         FabricEntityRegistration.register();
+
+        // Register networking payloads
+        FabricNetworking.registerPayloads();
 
         // Clear tracked chunks on server stop
         ServerLifecycleEvents.SERVER_STOPPED.register(server -> {

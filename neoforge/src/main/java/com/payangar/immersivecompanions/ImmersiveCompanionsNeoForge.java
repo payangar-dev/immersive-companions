@@ -2,6 +2,7 @@ package com.payangar.immersivecompanions;
 
 import com.payangar.immersivecompanions.client.ConfigScreenFactory;
 import com.payangar.immersivecompanions.compat.epicfight.EpicFightCompat;
+import com.payangar.immersivecompanions.network.NeoForgeNetworking;
 import com.payangar.immersivecompanions.platform.NeoForgeServices;
 import com.payangar.immersivecompanions.platform.Services;
 import com.payangar.immersivecompanions.registry.NeoForgeEntityRegistration;
@@ -20,6 +21,9 @@ public class ImmersiveCompanionsNeoForge {
 
         // Register entities
         NeoForgeEntityRegistration.register(modEventBus);
+
+        // Register networking
+        NeoForgeNetworking.register(modEventBus);
 
         // Register config screen (client-side only)
         if (FMLLoader.getDist() == Dist.CLIENT) {

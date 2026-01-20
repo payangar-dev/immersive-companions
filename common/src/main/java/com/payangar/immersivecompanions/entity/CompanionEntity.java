@@ -6,8 +6,11 @@ import com.payangar.immersivecompanions.data.CompanionNames;
 import com.payangar.immersivecompanions.data.CompanionSkins;
 import com.payangar.immersivecompanions.data.SkinInfo;
 import com.payangar.immersivecompanions.entity.ai.CompanionDefendVillageGoal;
+import com.payangar.immersivecompanions.entity.ai.CompanionInteractionGoal;
 import com.payangar.immersivecompanions.entity.ai.CompanionRangedAttackGoal;
 import com.payangar.immersivecompanions.entity.ai.CompanionTeamCoordinationGoal;
+import com.payangar.immersivecompanions.network.ModNetworking;
+import com.payangar.immersivecompanions.recruitment.CompanionPricing;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.syncher.EntityDataAccessor;
 import net.minecraft.network.syncher.EntityDataSerializers;
@@ -33,6 +36,8 @@ import net.minecraft.world.entity.npc.Villager;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.entity.projectile.AbstractArrow;
 import net.minecraft.world.entity.projectile.ProjectileUtil;
+import net.minecraft.world.InteractionHand;
+import net.minecraft.world.InteractionResult;
 import net.minecraft.world.item.BowItem;
 import net.minecraft.world.item.CrossbowItem;
 import net.minecraft.world.item.ItemStack;
@@ -44,6 +49,7 @@ import net.minecraft.world.phys.AABB;
 
 import javax.annotation.Nullable;
 import java.util.List;
+import java.util.UUID;
 
 public class CompanionEntity extends PathfinderMob implements RangedAttackMob {
 
@@ -59,6 +65,8 @@ public class CompanionEntity extends PathfinderMob implements RangedAttackMob {
             CompanionEntity.class, EntityDataSerializers.STRING);
     private static final EntityDataAccessor<Boolean> DATA_CRITICALLY_INJURED = SynchedEntityData.defineId(
             CompanionEntity.class, EntityDataSerializers.BOOLEAN);
+    private static final EntityDataAccessor<Integer> DATA_BASE_PRICE = SynchedEntityData.defineId(
+            CompanionEntity.class, EntityDataSerializers.INT);
 
     /** Default team for village-spawned companions */
     public static final String DEFAULT_TEAM = "village_guard";
@@ -69,6 +77,16 @@ public class CompanionEntity extends PathfinderMob implements RangedAttackMob {
 
     /** Callback for post-ranged-attack events (used by Epic Fight compat for shooting animation) */
     private Runnable onRangedAttackCallback = null;
+
+    /** UUID of the player currently interacting with this companion (recruitment screen open) */
+    @Nullable
+    private UUID interactingPlayerUUID = null;
+
+    /** Timeout counter to auto-clear interaction if player disconnects or screen closes without packet */
+    private int interactionTimeout = 0;
+
+    /** Maximum ticks before interaction auto-clears (30 seconds = 600 ticks) */
+    private static final int INTERACTION_TIMEOUT_TICKS = 600;
 
     public CompanionEntity(EntityType<? extends CompanionEntity> entityType, Level level) {
         super(entityType, level);
@@ -98,12 +116,16 @@ public class CompanionEntity extends PathfinderMob implements RangedAttackMob {
         builder.define(DATA_CHARGING, false);
         builder.define(DATA_TEAM, DEFAULT_TEAM);
         builder.define(DATA_CRITICALLY_INJURED, false);
+        builder.define(DATA_BASE_PRICE, 0);
     }
 
     @Override
     protected void registerGoals() {
-        // Priority 0: Swimming
-        this.goalSelector.addGoal(0, new FloatGoal(this));
+        // Priority 0: Interaction - stops movement and looks at player during recruitment screen
+        this.goalSelector.addGoal(0, new CompanionInteractionGoal(this));
+
+        // Priority 1: Swimming
+        this.goalSelector.addGoal(1, new FloatGoal(this));
 
         // Priority 1: Combat - added dynamically based on type
         // Will be set in finalizeSpawn after combat type is determined
@@ -213,6 +235,9 @@ public class CompanionEntity extends PathfinderMob implements RangedAttackMob {
         // Equip based on combat type
         CompanionEquipment.equipCompanion(this, combatType, level.getRandom());
 
+        // Calculate and store base price (must be after equipment is set)
+        setBasePrice(CompanionPricing.calculateBasePrice(this));
+
         // Set random name (custom names are always visible for mobs)
         this.setCustomName(CompanionNames.generateName(gender, level.getRandom()));
 
@@ -297,6 +322,64 @@ public class CompanionEntity extends PathfinderMob implements RangedAttackMob {
         }
     }
 
+    /**
+     * Gets the base recruitment price for this companion.
+     * This is calculated once at spawn time and never changes.
+     */
+    public int getBasePrice() {
+        return this.entityData.get(DATA_BASE_PRICE);
+    }
+
+    /**
+     * Sets the base recruitment price for this companion.
+     * Should only be called once during spawn.
+     */
+    public void setBasePrice(int price) {
+        this.entityData.set(DATA_BASE_PRICE, price);
+    }
+
+    /**
+     * Sets the player currently interacting with this companion.
+     * Called when a player opens the recruitment screen.
+     *
+     * @param player The player who opened the recruitment screen
+     */
+    public void setInteractingPlayer(Player player) {
+        this.interactingPlayerUUID = player.getUUID();
+        this.interactionTimeout = INTERACTION_TIMEOUT_TICKS;
+    }
+
+    /**
+     * Clears the interacting player state.
+     * Called when the recruitment screen is closed.
+     */
+    public void clearInteractingPlayer() {
+        this.interactingPlayerUUID = null;
+        this.interactionTimeout = 0;
+    }
+
+    /**
+     * Checks if this companion is currently being interacted with by a player.
+     *
+     * @return true if a player has the recruitment screen open for this companion
+     */
+    public boolean isBeingInteractedWith() {
+        return this.interactingPlayerUUID != null;
+    }
+
+    /**
+     * Gets the player currently interacting with this companion.
+     *
+     * @return The interacting player, or null if none
+     */
+    @Nullable
+    public Player getInteractingPlayer() {
+        if (this.interactingPlayerUUID == null) {
+            return null;
+        }
+        return this.level().getPlayerByUUID(this.interactingPlayerUUID);
+    }
+
     public ResourceLocation getSkinTexture() {
         return CompanionSkins.getSkin(getGender(), getSkinIndex());
     }
@@ -318,6 +401,7 @@ public class CompanionEntity extends PathfinderMob implements RangedAttackMob {
         tag.putInt("SkinIndex", getSkinIndex());
         tag.putString("Team", getCompanionTeam());
         tag.putBoolean("CriticallyInjured", isCriticallyInjured());
+        tag.putInt("BasePrice", getBasePrice());
     }
 
     @Override
@@ -338,6 +422,9 @@ public class CompanionEntity extends PathfinderMob implements RangedAttackMob {
         }
         if (tag.contains("CriticallyInjured")) {
             setCriticallyInjured(tag.getBoolean("CriticallyInjured"));
+        }
+        if (tag.contains("BasePrice")) {
+            setBasePrice(tag.getInt("BasePrice"));
         }
     }
 
@@ -442,11 +529,27 @@ public class CompanionEntity extends PathfinderMob implements RangedAttackMob {
     @Override
     public void tick() {
         super.tick();
-        // Periodic health check for edge cases (regen effects, commands, etc.)
-        if (!this.level().isClientSide && this.tickCount % 10 == 0 && ModConfig.get().isEnableCriticalInjury()) {
-            boolean shouldBeInjured = this.getHealth() <= ModConfig.get().getCriticalInjuryThreshold();
-            if (this.isCriticallyInjured() != shouldBeInjured) {
-                setCriticallyInjured(shouldBeInjured);
+
+        if (!this.level().isClientSide) {
+            // Handle interaction timeout
+            if (this.interactingPlayerUUID != null) {
+                // Check if player is still valid
+                Player interactingPlayer = getInteractingPlayer();
+                if (interactingPlayer == null || !interactingPlayer.isAlive()) {
+                    // Player disconnected or died - clear interaction
+                    clearInteractingPlayer();
+                } else if (--this.interactionTimeout <= 0) {
+                    // Timeout expired - clear interaction
+                    clearInteractingPlayer();
+                }
+            }
+
+            // Periodic health check for edge cases (regen effects, commands, etc.)
+            if (this.tickCount % 10 == 0 && ModConfig.get().isEnableCriticalInjury()) {
+                boolean shouldBeInjured = this.getHealth() <= ModConfig.get().getCriticalInjuryThreshold();
+                if (this.isCriticallyInjured() != shouldBeInjured) {
+                    setCriticallyInjured(shouldBeInjured);
+                }
             }
         }
     }
@@ -475,5 +578,30 @@ public class CompanionEntity extends PathfinderMob implements RangedAttackMob {
     public boolean canUseRangedWeapon() {
         ItemStack mainHand = this.getMainHandItem();
         return mainHand.getItem() instanceof BowItem || mainHand.getItem() instanceof CrossbowItem;
+    }
+
+    @Override
+    protected InteractionResult mobInteract(Player player, InteractionHand hand) {
+        // Only handle main hand interactions for companions in the default team
+        if (hand == InteractionHand.MAIN_HAND && DEFAULT_TEAM.equals(getCompanionTeam())) {
+            if (!this.level().isClientSide && player instanceof net.minecraft.server.level.ServerPlayer serverPlayer) {
+                // Block concurrent interactions - only one player can interact at a time
+                if (isBeingInteractedWith()) {
+                    return InteractionResult.FAIL;
+                }
+
+                // Set interaction state before opening screen
+                setInteractingPlayer(player);
+
+                // Use stored base price, apply reputation modifier for final price
+                int basePrice = getBasePrice();
+                int finalPrice = CompanionPricing.calculateFinalPrice(basePrice, this, player);
+
+                // Send packet to open recruitment screen
+                ModNetworking.get().sendOpenRecruitmentScreen(serverPlayer, this.getId(), basePrice, finalPrice);
+            }
+            return InteractionResult.sidedSuccess(this.level().isClientSide);
+        }
+        return super.mobInteract(player, hand);
     }
 }

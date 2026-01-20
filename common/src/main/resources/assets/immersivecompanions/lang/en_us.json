@@ -6,5 +6,11 @@
     "config.immersivecompanions.criticalInjuryThreshold": "Critical Injury Threshold",
     "config.immersivecompanions.criticalInjuryThreshold.desc": "Health threshold (in half-hearts) at which companions become critically injured. Default: 4 (2 hearts)",
     "config.immersivecompanions.criticalInjurySpeedMultiplier": "Injured Speed Multiplier",
-    "config.immersivecompanions.criticalInjurySpeedMultiplier.desc": "Movement speed multiplier when critically injured. 0.5 = 50% speed. Default: 0.5"
+    "config.immersivecompanions.criticalInjurySpeedMultiplier.desc": "Movement speed multiplier when critically injured. 0.5 = 50% speed. Default: 0.5",
+
+    "gui.immersivecompanions.recruitment.title": "Recruit Companion",
+    "gui.immersivecompanions.recruitment.dialogue": "I'll guard your back if you make it worth my while...",
+    "gui.immersivecompanions.recruitment.price": "Price:",
+    "gui.immersivecompanions.recruitment.deny": "Deny",
+    "gui.immersivecompanions.recruitment.recruit": "Recruit"
 }

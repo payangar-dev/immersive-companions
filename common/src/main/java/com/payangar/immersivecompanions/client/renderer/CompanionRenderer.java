@@ -57,6 +57,10 @@ public class CompanionRenderer extends HumanoidMobRenderer<CompanionEntity, Play
         SkinInfo skinInfo = entity.getSkinInfo();
         this.model = skinInfo.slim() ? slimModel : normalModel;
 
+        // Set crouching state - required for vanilla rendering since HumanoidMobRenderer
+        // doesn't set this for non-player entities (unlike PlayerRenderer)
+        this.model.crouching = entity.isCrouching();
+
         // Set arm pose based on charging state
         setModelArmPose(entity);
 

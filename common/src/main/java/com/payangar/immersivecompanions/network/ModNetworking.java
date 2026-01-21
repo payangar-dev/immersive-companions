@@ -27,6 +27,14 @@ public interface ModNetworking {
     void sendCloseRecruitmentScreen(int entityId);
 
     /**
+     * Sends a purchase companion packet from client to server.
+     * Called when the player clicks the recruit button.
+     *
+     * @param entityId The entity ID of the companion to purchase
+     */
+    void sendPurchaseCompanion(int entityId);
+
+    /**
      * Gets the networking instance.
      */
     static ModNetworking get() {

@@ -9,6 +9,9 @@ import com.payangar.immersivecompanions.entity.ai.CompanionDefendVillageGoal;
 import com.payangar.immersivecompanions.entity.ai.CompanionInteractionGoal;
 import com.payangar.immersivecompanions.entity.ai.CompanionRangedAttackGoal;
 import com.payangar.immersivecompanions.entity.ai.CompanionTeamCoordinationGoal;
+import com.payangar.immersivecompanions.entity.mode.CompanionMode;
+import com.payangar.immersivecompanions.entity.mode.CompanionModes;
+import com.payangar.immersivecompanions.entity.mode.GoalEntry;
 import com.payangar.immersivecompanions.network.ModNetworking;
 import com.payangar.immersivecompanions.recruitment.CompanionPricing;
 import net.minecraft.nbt.CompoundTag;
@@ -48,6 +51,7 @@ import net.minecraft.world.entity.ai.navigation.GroundPathNavigation;
 import net.minecraft.world.phys.AABB;
 
 import javax.annotation.Nullable;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
@@ -67,6 +71,8 @@ public class CompanionEntity extends PathfinderMob implements RangedAttackMob {
             CompanionEntity.class, EntityDataSerializers.BOOLEAN);
     private static final EntityDataAccessor<Integer> DATA_BASE_PRICE = SynchedEntityData.defineId(
             CompanionEntity.class, EntityDataSerializers.INT);
+    private static final EntityDataAccessor<String> DATA_MODE_ID = SynchedEntityData.defineId(
+            CompanionEntity.class, EntityDataSerializers.STRING);
 
     /** Default team for village-spawned companions */
     public static final String DEFAULT_TEAM = "village_guard";
@@ -87,6 +93,16 @@ public class CompanionEntity extends PathfinderMob implements RangedAttackMob {
 
     /** Maximum ticks before interaction auto-clears (30 seconds = 600 ticks) */
     private static final int INTERACTION_TIMEOUT_TICKS = 600;
+
+    /** UUID of the player who owns this companion (null if unbought) */
+    @Nullable
+    private UUID ownerUUID = null;
+
+    /** Current behavioral mode */
+    private CompanionMode currentMode = CompanionModes.WANDER;
+
+    /** List of goals added by the current mode (for removal on mode change) */
+    private final List<Goal> activeModeGoals = new ArrayList<>();
 
     public CompanionEntity(EntityType<? extends CompanionEntity> entityType, Level level) {
         super(entityType, level);
@@ -117,6 +133,7 @@ public class CompanionEntity extends PathfinderMob implements RangedAttackMob {
         builder.define(DATA_TEAM, DEFAULT_TEAM);
         builder.define(DATA_CRITICALLY_INJURED, false);
         builder.define(DATA_BASE_PRICE, 0);
+        builder.define(DATA_MODE_ID, CompanionModes.WANDER.getId());
     }
 
     @Override
@@ -136,8 +153,7 @@ public class CompanionEntity extends PathfinderMob implements RangedAttackMob {
         // Priority 5: Village binding
         this.goalSelector.addGoal(5, new MoveTowardsRestrictionGoal(this, 1.0));
 
-        // Priority 6: Wandering
-        this.goalSelector.addGoal(6, new WaterAvoidingRandomStrollGoal(this, 0.9));
+        // Priority 6: Mode-specific goals are added dynamically via setMode()
 
         // Priority 7-8: Looking around
         this.goalSelector.addGoal(7, new LookAtPlayerGoal(this, Player.class, 8.0F));
@@ -241,6 +257,9 @@ public class CompanionEntity extends PathfinderMob implements RangedAttackMob {
         // Set random name (custom names are always visible for mobs)
         this.setCustomName(CompanionNames.generateName(gender, level.getRandom()));
 
+        // Initialize default mode (wander for newly spawned companions)
+        registerModeGoals(CompanionModes.WANDER);
+
         return spawnData;
     }
 
@@ -338,6 +357,118 @@ public class CompanionEntity extends PathfinderMob implements RangedAttackMob {
         this.entityData.set(DATA_BASE_PRICE, price);
     }
 
+    // ========== Mode System ==========
+
+    /**
+     * Gets the current behavioral mode.
+     *
+     * @return The current mode
+     */
+    public CompanionMode getMode() {
+        return this.currentMode;
+    }
+
+    /**
+     * Sets the behavioral mode, handling goal transitions.
+     * Removes goals from the old mode and adds goals from the new mode.
+     *
+     * @param mode The new mode to set
+     */
+    public void setMode(CompanionMode mode) {
+        if (mode == null || mode == this.currentMode) {
+            return;
+        }
+
+        // Check if transition is allowed
+        if (!this.currentMode.canTransitionTo(mode, this)) {
+            return;
+        }
+
+        // Exit old mode
+        this.currentMode.onExit(this);
+        removeModeGoals();
+
+        // Enter new mode
+        this.currentMode = mode;
+        this.entityData.set(DATA_MODE_ID, mode.getId());
+        registerModeGoals(mode);
+        this.currentMode.onEnter(this);
+    }
+
+    /**
+     * Registers goals from a mode.
+     */
+    private void registerModeGoals(CompanionMode mode) {
+        for (GoalEntry entry : mode.getGoals()) {
+            Goal goal = entry.factory().apply(this);
+            this.goalSelector.addGoal(entry.priority(), goal);
+            this.activeModeGoals.add(goal);
+        }
+    }
+
+    /**
+     * Removes all goals added by the current mode.
+     */
+    private void removeModeGoals() {
+        for (Goal goal : this.activeModeGoals) {
+            this.goalSelector.removeGoal(goal);
+        }
+        this.activeModeGoals.clear();
+    }
+
+    // ========== Owner System ==========
+
+    /**
+     * Gets the UUID of the player who owns this companion.
+     *
+     * @return The owner's UUID, or null if unbought
+     */
+    @Nullable
+    public UUID getOwnerUUID() {
+        return this.ownerUUID;
+    }
+
+    /**
+     * Sets the owner of this companion.
+     *
+     * @param uuid The owner's UUID, or null to clear ownership
+     */
+    public void setOwnerUUID(@Nullable UUID uuid) {
+        this.ownerUUID = uuid;
+    }
+
+    /**
+     * Checks if this companion has an owner.
+     *
+     * @return true if the companion is owned by a player
+     */
+    public boolean hasOwner() {
+        return this.ownerUUID != null;
+    }
+
+    /**
+     * Gets the player who owns this companion.
+     *
+     * @return The owner player, or null if unbought or owner offline
+     */
+    @Nullable
+    public Player getOwner() {
+        if (this.ownerUUID == null) {
+            return null;
+        }
+        return this.level().getPlayerByUUID(this.ownerUUID);
+    }
+
+    /**
+     * Checks if this companion is owned by a specific player.
+     *
+     * @param player The player to check
+     * @return true if the companion is owned by this player
+     */
+    public boolean isOwnedBy(Player player) {
+        return this.ownerUUID != null && this.ownerUUID.equals(player.getUUID());
+    }
+
     /**
      * Sets the player currently interacting with this companion.
      * Called when a player opens the recruitment screen.
@@ -402,6 +533,10 @@ public class CompanionEntity extends PathfinderMob implements RangedAttackMob {
         tag.putString("Team", getCompanionTeam());
         tag.putBoolean("CriticallyInjured", isCriticallyInjured());
         tag.putInt("BasePrice", getBasePrice());
+        tag.putString("ModeId", currentMode.getId());
+        if (ownerUUID != null) {
+            tag.putUUID("OwnerUUID", ownerUUID);
+        }
     }
 
     @Override
@@ -425,6 +560,19 @@ public class CompanionEntity extends PathfinderMob implements RangedAttackMob {
         }
         if (tag.contains("BasePrice")) {
             setBasePrice(tag.getInt("BasePrice"));
+        }
+        if (tag.contains("OwnerUUID")) {
+            this.ownerUUID = tag.getUUID("OwnerUUID");
+        }
+        if (tag.contains("ModeId")) {
+            String modeId = tag.getString("ModeId");
+            CompanionMode mode = CompanionMode.byId(modeId);
+            this.currentMode = mode;
+            this.entityData.set(DATA_MODE_ID, mode.getId());
+            registerModeGoals(mode);
+        } else {
+            // Default: register wander mode goals for entities without saved mode
+            registerModeGoals(CompanionModes.WANDER);
         }
     }
 
@@ -551,6 +699,9 @@ public class CompanionEntity extends PathfinderMob implements RangedAttackMob {
                     setCriticallyInjured(shouldBeInjured);
                 }
             }
+
+            // Mode tick
+            this.currentMode.tick(this);
         }
     }
 
@@ -582,26 +733,38 @@ public class CompanionEntity extends PathfinderMob implements RangedAttackMob {
 
     @Override
     protected InteractionResult mobInteract(Player player, InteractionHand hand) {
-        // Only handle main hand interactions for companions in the default team
-        if (hand == InteractionHand.MAIN_HAND && DEFAULT_TEAM.equals(getCompanionTeam())) {
-            if (!this.level().isClientSide && player instanceof net.minecraft.server.level.ServerPlayer serverPlayer) {
-                // Block concurrent interactions - only one player can interact at a time
-                if (isBeingInteractedWith()) {
-                    return InteractionResult.FAIL;
-                }
-
-                // Set interaction state before opening screen
-                setInteractingPlayer(player);
-
-                // Use stored base price, apply reputation modifier for final price
-                int basePrice = getBasePrice();
-                int finalPrice = CompanionPricing.calculateFinalPrice(basePrice, this, player);
-
-                // Send packet to open recruitment screen
-                ModNetworking.get().sendOpenRecruitmentScreen(serverPlayer, this.getId(), basePrice, finalPrice);
-            }
-            return InteractionResult.sidedSuccess(this.level().isClientSide);
+        // Only handle main hand interactions
+        if (hand != InteractionHand.MAIN_HAND) {
+            return super.mobInteract(player, hand);
         }
-        return super.mobInteract(player, hand);
+
+        // Skip recruitment for owned companions (future: mode cycling GUI)
+        if (hasOwner()) {
+            // TODO: Open mode cycling GUI for owner
+            return super.mobInteract(player, hand);
+        }
+
+        // Only show recruitment screen for companions in the default team
+        if (!DEFAULT_TEAM.equals(getCompanionTeam())) {
+            return super.mobInteract(player, hand);
+        }
+
+        if (!this.level().isClientSide && player instanceof net.minecraft.server.level.ServerPlayer serverPlayer) {
+            // Block concurrent interactions - only one player can interact at a time
+            if (isBeingInteractedWith()) {
+                return InteractionResult.FAIL;
+            }
+
+            // Set interaction state before opening screen
+            setInteractingPlayer(player);
+
+            // Use stored base price, apply reputation modifier for final price
+            int basePrice = getBasePrice();
+            int finalPrice = CompanionPricing.calculateFinalPrice(basePrice, this, player);
+
+            // Send packet to open recruitment screen
+            ModNetworking.get().sendOpenRecruitmentScreen(serverPlayer, this.getId(), basePrice, finalPrice);
+        }
+        return InteractionResult.sidedSuccess(this.level().isClientSide);
     }
 }

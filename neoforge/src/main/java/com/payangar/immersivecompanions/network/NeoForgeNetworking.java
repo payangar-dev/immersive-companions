@@ -3,6 +3,8 @@ package com.payangar.immersivecompanions.network;
 import com.payangar.immersivecompanions.ImmersiveCompanions;
 import com.payangar.immersivecompanions.client.gui.CompanionRecruitmentScreen;
 import com.payangar.immersivecompanions.entity.CompanionEntity;
+import com.payangar.immersivecompanions.entity.mode.CompanionModes;
+import com.payangar.immersivecompanions.recruitment.CompanionPricing;
 import net.minecraft.client.Minecraft;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
@@ -42,6 +44,13 @@ public class NeoForgeNetworking implements ModNetworking {
                 CloseRecruitmentScreenPayload.STREAM_CODEC,
                 NeoForgeNetworking::handleCloseRecruitmentScreen
         );
+
+        // C2S: Purchase companion
+        registrar.playToServer(
+                PurchaseCompanionPayload.TYPE,
+                PurchaseCompanionPayload.STREAM_CODEC,
+                NeoForgeNetworking::handlePurchaseCompanion
+        );
     }
 
     private static void handleOpenRecruitmentScreen(OpenRecruitmentScreenPayload payload, IPayloadContext context) {
@@ -78,6 +87,37 @@ public class NeoForgeNetworking implements ModNetworking {
         });
     }
 
+    private static void handlePurchaseCompanion(PurchaseCompanionPayload payload, IPayloadContext context) {
+        context.enqueueWork(() -> {
+            if (context.player() instanceof ServerPlayer player) {
+                ServerLevel level = player.serverLevel();
+                var entity = level.getEntity(payload.entityId());
+                if (entity instanceof CompanionEntity companion) {
+                    // Validate that this player is the one interacting
+                    var interacting = companion.getInteractingPlayer();
+                    if (interacting == null || !player.getUUID().equals(interacting.getUUID())) {
+                        return; // Not the interacting player
+                    }
+
+                    // Recalculate price server-side for security
+                    int basePrice = companion.getBasePrice();
+                    int finalPrice = CompanionPricing.calculateFinalPrice(basePrice, companion, player);
+
+                    // Deduct emeralds
+                    if (!CompanionPricing.removeEmeralds(player, finalPrice)) {
+                        return; // Can't afford
+                    }
+
+                    // Transfer ownership
+                    companion.setOwnerUUID(player.getUUID());
+                    companion.setCompanionTeam("player_" + player.getUUID().toString());
+                    companion.setMode(CompanionModes.FOLLOW);
+                    companion.clearInteractingPlayer();
+                }
+            }
+        });
+    }
+
     @Override
     public void sendOpenRecruitmentScreen(ServerPlayer player, int entityId, int basePrice, int finalPrice) {
         PacketDistributor.sendToPlayer(player, new OpenRecruitmentScreenPayload(entityId, basePrice, finalPrice));
@@ -86,5 +126,10 @@ public class NeoForgeNetworking implements ModNetworking {
     @Override
     public void sendCloseRecruitmentScreen(int entityId) {
         PacketDistributor.sendToServer(new CloseRecruitmentScreenPayload(entityId));
+    }
+
+    @Override
+    public void sendPurchaseCompanion(int entityId) {
+        PacketDistributor.sendToServer(new PurchaseCompanionPayload(entityId));
     }
 }

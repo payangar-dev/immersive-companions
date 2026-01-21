@@ -204,4 +204,30 @@ public class CompanionPricing {
         }
         return count;
     }
+
+    /**
+     * Removes emeralds from a player's inventory.
+     * Emeralds are removed from the first available stacks until the amount is fulfilled.
+     *
+     * @param player The player to remove emeralds from
+     * @param amount The number of emeralds to remove
+     * @return true if the full amount was removed, false if player doesn't have enough
+     */
+    public static boolean removeEmeralds(Player player, int amount) {
+        if (countEmeralds(player) < amount) {
+            return false;
+        }
+
+        int remaining = amount;
+        for (int i = 0; i < player.getInventory().items.size() && remaining > 0; i++) {
+            ItemStack stack = player.getInventory().items.get(i);
+            if (stack.is(Items.EMERALD)) {
+                int toRemove = Math.min(remaining, stack.getCount());
+                stack.shrink(toRemove);
+                remaining -= toRemove;
+            }
+        }
+
+        return remaining == 0;
+    }
 }

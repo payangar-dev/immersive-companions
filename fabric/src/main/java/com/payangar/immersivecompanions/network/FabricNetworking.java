@@ -2,6 +2,8 @@ package com.payangar.immersivecompanions.network;
 
 import com.payangar.immersivecompanions.client.gui.CompanionRecruitmentScreen;
 import com.payangar.immersivecompanions.entity.CompanionEntity;
+import com.payangar.immersivecompanions.entity.mode.CompanionModes;
+import com.payangar.immersivecompanions.recruitment.CompanionPricing;
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
@@ -32,6 +34,12 @@ public class FabricNetworking implements ModNetworking {
                 CloseRecruitmentScreenPayload.STREAM_CODEC
         );
 
+        // C2S: Purchase companion
+        PayloadTypeRegistry.playC2S().register(
+                PurchaseCompanionPayload.TYPE,
+                PurchaseCompanionPayload.STREAM_CODEC
+        );
+
         // Register server handler for close packet
         ServerPlayNetworking.registerGlobalReceiver(
                 CloseRecruitmentScreenPayload.TYPE,
@@ -47,6 +55,41 @@ public class FabricNetworking implements ModNetworking {
                                     companion.getInteractingPlayer().getUUID() : null)) {
                                 companion.clearInteractingPlayer();
                             }
+                        }
+                    });
+                }
+        );
+
+        // Register server handler for purchase packet
+        ServerPlayNetworking.registerGlobalReceiver(
+                PurchaseCompanionPayload.TYPE,
+                (payload, context) -> {
+                    ServerPlayer player = context.player();
+                    ServerLevel level = player.serverLevel();
+
+                    context.server().execute(() -> {
+                        var entity = level.getEntity(payload.entityId());
+                        if (entity instanceof CompanionEntity companion) {
+                            // Validate that this player is the one interacting
+                            var interacting = companion.getInteractingPlayer();
+                            if (interacting == null || !player.getUUID().equals(interacting.getUUID())) {
+                                return; // Not the interacting player
+                            }
+
+                            // Recalculate price server-side for security
+                            int basePrice = companion.getBasePrice();
+                            int finalPrice = CompanionPricing.calculateFinalPrice(basePrice, companion, player);
+
+                            // Deduct emeralds
+                            if (!CompanionPricing.removeEmeralds(player, finalPrice)) {
+                                return; // Can't afford
+                            }
+
+                            // Transfer ownership
+                            companion.setOwnerUUID(player.getUUID());
+                            companion.setCompanionTeam("player_" + player.getUUID().toString());
+                            companion.setMode(CompanionModes.FOLLOW);
+                            companion.clearInteractingPlayer();
                         }
                     });
                 }
@@ -90,5 +133,11 @@ public class FabricNetworking implements ModNetworking {
     @Environment(EnvType.CLIENT)
     public void sendCloseRecruitmentScreen(int entityId) {
         ClientPlayNetworking.send(new CloseRecruitmentScreenPayload(entityId));
+    }
+
+    @Override
+    @Environment(EnvType.CLIENT)
+    public void sendPurchaseCompanion(int entityId) {
+        ClientPlayNetworking.send(new PurchaseCompanionPayload(entityId));
     }
 }

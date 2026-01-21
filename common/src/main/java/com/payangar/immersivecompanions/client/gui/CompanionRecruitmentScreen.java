@@ -103,8 +103,8 @@ public class CompanionRecruitmentScreen extends Screen {
     }
 
     private void onRecruit() {
-        // Phase 1: Button is visible but purchase logic not implemented yet
-        // Just close the screen for now
+        // Send purchase packet to server
+        ModNetworking.get().sendPurchaseCompanion(this.entityId);
         this.onClose();
     }
 

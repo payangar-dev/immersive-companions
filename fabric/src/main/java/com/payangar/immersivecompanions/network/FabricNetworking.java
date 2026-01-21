@@ -2,6 +2,7 @@ package com.payangar.immersivecompanions.network;
 
 import com.payangar.immersivecompanions.client.gui.CompanionRecruitmentScreen;
 import com.payangar.immersivecompanions.entity.CompanionEntity;
+import com.payangar.immersivecompanions.entity.combat.CombatStances;
 import com.payangar.immersivecompanions.entity.mode.CompanionModes;
 import com.payangar.immersivecompanions.recruitment.CompanionPricing;
 import net.fabricmc.api.EnvType;
@@ -89,6 +90,7 @@ public class FabricNetworking implements ModNetworking {
                             companion.setOwnerUUID(player.getUUID());
                             companion.setCompanionTeam("player_" + player.getUUID().toString());
                             companion.setMode(CompanionModes.FOLLOW);
+                            companion.setCombatStance(CombatStances.ASSIST);
                             companion.clearInteractingPlayer();
 
                             // Send recruitment message to the player

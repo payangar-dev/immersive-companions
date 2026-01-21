@@ -5,10 +5,11 @@ import com.payangar.immersivecompanions.data.CompanionEquipment;
 import com.payangar.immersivecompanions.data.CompanionNames;
 import com.payangar.immersivecompanions.data.CompanionSkins;
 import com.payangar.immersivecompanions.data.SkinInfo;
-import com.payangar.immersivecompanions.entity.ai.CompanionDefendVillageGoal;
 import com.payangar.immersivecompanions.entity.ai.CompanionInteractionGoal;
 import com.payangar.immersivecompanions.entity.ai.CompanionRangedAttackGoal;
-import com.payangar.immersivecompanions.entity.ai.CompanionTeamCoordinationGoal;
+import com.payangar.immersivecompanions.entity.combat.CombatStance;
+import com.payangar.immersivecompanions.entity.combat.CombatStances;
+import com.payangar.immersivecompanions.entity.combat.TargetGoalEntry;
 import com.payangar.immersivecompanions.entity.mode.CompanionMode;
 import com.payangar.immersivecompanions.entity.mode.CompanionModes;
 import com.payangar.immersivecompanions.entity.mode.GoalEntry;
@@ -29,11 +30,6 @@ import net.minecraft.world.entity.ai.attributes.AttributeModifier;
 import net.minecraft.world.entity.ai.attributes.AttributeSupplier;
 import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.entity.ai.goal.*;
-import net.minecraft.world.entity.ai.goal.target.HurtByTargetGoal;
-import net.minecraft.world.entity.ai.goal.target.NearestAttackableTargetGoal;
-import net.minecraft.world.entity.monster.Creeper;
-import net.minecraft.world.entity.monster.EnderMan;
-import net.minecraft.world.entity.monster.Monster;
 import net.minecraft.world.entity.monster.RangedAttackMob;
 import net.minecraft.world.entity.npc.Villager;
 import net.minecraft.world.entity.player.Player;
@@ -73,6 +69,8 @@ public class CompanionEntity extends PathfinderMob implements RangedAttackMob {
             CompanionEntity.class, EntityDataSerializers.INT);
     private static final EntityDataAccessor<String> DATA_MODE_ID = SynchedEntityData.defineId(
             CompanionEntity.class, EntityDataSerializers.STRING);
+    private static final EntityDataAccessor<String> DATA_COMBAT_STANCE = SynchedEntityData.defineId(
+            CompanionEntity.class, EntityDataSerializers.STRING);
 
     /** Default team for village-spawned companions */
     public static final String DEFAULT_TEAM = "village_guard";
@@ -104,6 +102,15 @@ public class CompanionEntity extends PathfinderMob implements RangedAttackMob {
     /** List of goals added by the current mode (for removal on mode change) */
     private final List<Goal> activeModeGoals = new ArrayList<>();
 
+    /** Current combat stance controlling targeting behavior */
+    private CombatStance currentStance = CombatStances.AGGRESSIVE;
+
+    /** List of target goals added by the current stance (for removal on stance change) */
+    private final List<Goal> activeStanceTargetGoals = new ArrayList<>();
+
+    /** List of behavior goals added by the current stance (for removal on stance change) */
+    private final List<Goal> activeStanceBehaviorGoals = new ArrayList<>();
+
     public CompanionEntity(EntityType<? extends CompanionEntity> entityType, Level level) {
         super(entityType, level);
         setPersistenceRequired();
@@ -134,6 +141,7 @@ public class CompanionEntity extends PathfinderMob implements RangedAttackMob {
         builder.define(DATA_CRITICALLY_INJURED, false);
         builder.define(DATA_BASE_PRICE, 0);
         builder.define(DATA_MODE_ID, CompanionModes.WANDER.getId());
+        builder.define(DATA_COMBAT_STANCE, CombatStances.AGGRESSIVE.getId());
     }
 
     @Override
@@ -159,27 +167,8 @@ public class CompanionEntity extends PathfinderMob implements RangedAttackMob {
         this.goalSelector.addGoal(7, new LookAtPlayerGoal(this, Player.class, 8.0F));
         this.goalSelector.addGoal(8, new RandomLookAroundGoal(this));
 
-        // Target goals
-        // Priority 2: Retaliation (but not against same-team companions)
-        this.targetSelector.addGoal(2, new HurtByTargetGoal(this) {
-            @Override
-            public boolean canUse() {
-                if (!super.canUse()) return false;
-                // Don't retaliate against same-team companions
-                LivingEntity attacker = this.mob.getLastHurtByMob();
-                return !isOnSameTeam(attacker);
-            }
-        });
-
-        // Priority 3: Team coordination (defend and assist teammates)
-        this.targetSelector.addGoal(3, new CompanionTeamCoordinationGoal(this));
-
-        // Priority 4: Attack monsters (filtered)
-        this.targetSelector.addGoal(4, new NearestAttackableTargetGoal<>(this, Monster.class, 10, true, false,
-                this::shouldAttackEntity));
-
-        // Priority 5: Village defense
-        this.targetSelector.addGoal(5, new CompanionDefendVillageGoal(this));
+        // Target goals are added dynamically via setCombatStance()
+        // based on the companion's current combat stance
     }
 
     private void registerCombatGoals() {
@@ -222,14 +211,6 @@ public class CompanionEntity extends PathfinderMob implements RangedAttackMob {
         }
     }
 
-    private boolean shouldAttackEntity(LivingEntity entity) {
-        // Don't attack Creepers or Endermen
-        if (entity instanceof Creeper || entity instanceof EnderMan) {
-            return false;
-        }
-        return entity instanceof Monster;
-    }
-
     @Nullable
     @Override
     public SpawnGroupData finalizeSpawn(ServerLevelAccessor level, DifficultyInstance difficulty,
@@ -259,6 +240,9 @@ public class CompanionEntity extends PathfinderMob implements RangedAttackMob {
 
         // Initialize default mode (wander for newly spawned companions)
         registerModeGoals(CompanionModes.WANDER);
+
+        // Initialize default combat stance (aggressive for unowned companions)
+        registerStanceGoals(CombatStances.AGGRESSIVE);
 
         return spawnData;
     }
@@ -416,6 +400,81 @@ public class CompanionEntity extends PathfinderMob implements RangedAttackMob {
         this.activeModeGoals.clear();
     }
 
+    // ========== Combat Stance System ==========
+
+    /**
+     * Gets the current combat stance.
+     *
+     * @return The current stance
+     */
+    public CombatStance getCombatStance() {
+        return this.currentStance;
+    }
+
+    /**
+     * Sets the combat stance, handling target goal transitions.
+     * Removes goals from the old stance and adds goals from the new stance.
+     *
+     * @param stance The new stance to set
+     */
+    public void setCombatStance(CombatStance stance) {
+        if (stance == null || stance == this.currentStance) {
+            return;
+        }
+
+        // Exit old stance
+        this.currentStance.onExit(this);
+        removeStanceGoals();
+
+        // Enter new stance
+        this.currentStance = stance;
+        this.entityData.set(DATA_COMBAT_STANCE, stance.getId());
+        registerStanceGoals(stance);
+        this.currentStance.onEnter(this);
+    }
+
+    /**
+     * Cycles to the next combat stance in order.
+     * Order: PASSIVE → DEFENSIVE → ASSIST → AGGRESSIVE → PASSIVE
+     */
+    public void cycleCombatStance() {
+        setCombatStance(CombatStances.next(currentStance));
+    }
+
+    /**
+     * Registers goals from a stance.
+     */
+    private void registerStanceGoals(CombatStance stance) {
+        // Register target goals
+        for (TargetGoalEntry entry : stance.getTargetGoals()) {
+            Goal goal = entry.factory().apply(this);
+            this.targetSelector.addGoal(entry.priority(), goal);
+            this.activeStanceTargetGoals.add(goal);
+        }
+
+        // Register behavior goals
+        for (GoalEntry entry : stance.getBehaviorGoals()) {
+            Goal goal = entry.factory().apply(this);
+            this.goalSelector.addGoal(entry.priority(), goal);
+            this.activeStanceBehaviorGoals.add(goal);
+        }
+    }
+
+    /**
+     * Removes all goals added by the current stance.
+     */
+    private void removeStanceGoals() {
+        for (Goal goal : this.activeStanceTargetGoals) {
+            this.targetSelector.removeGoal(goal);
+        }
+        this.activeStanceTargetGoals.clear();
+
+        for (Goal goal : this.activeStanceBehaviorGoals) {
+            this.goalSelector.removeGoal(goal);
+        }
+        this.activeStanceBehaviorGoals.clear();
+    }
+
     // ========== Owner System ==========
 
     /**
@@ -562,6 +621,7 @@ public class CompanionEntity extends PathfinderMob implements RangedAttackMob {
         tag.putBoolean("CriticallyInjured", isCriticallyInjured());
         tag.putInt("BasePrice", getBasePrice());
         tag.putString("ModeId", currentMode.getId());
+        tag.putString("CombatStance", currentStance.getId());
         if (ownerUUID != null) {
             tag.putUUID("OwnerUUID", ownerUUID);
         }
@@ -601,6 +661,17 @@ public class CompanionEntity extends PathfinderMob implements RangedAttackMob {
         } else {
             // Default: register wander mode goals for entities without saved mode
             registerModeGoals(CompanionModes.WANDER);
+        }
+
+        if (tag.contains("CombatStance")) {
+            String stanceId = tag.getString("CombatStance");
+            CombatStance stance = CombatStance.byId(stanceId);
+            this.currentStance = stance;
+            this.entityData.set(DATA_COMBAT_STANCE, stance.getId());
+            registerStanceGoals(stance);
+        } else {
+            // Default: register aggressive stance goals for entities without saved stance
+            registerStanceGoals(CombatStances.AGGRESSIVE);
         }
     }
 

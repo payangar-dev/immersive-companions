@@ -11,25 +11,28 @@ import javax.annotation.Nullable;
 import java.util.List;
 
 /**
- * AI goal that makes companions coordinate with teammates:
- * - Defend: Attack entities that are hurting same-team companions
- * - Assist: Help same-team companions that are attacking something
+ * AI goal that makes companions defend same-team companions under attack.
+ * Unlike CompanionTeamCoordinationGoal, this only defends - it does not assist
+ * teammates in attacking their targets.
  *
- * Defend takes precedence over assist.
+ * <p>Used by the Defensive combat stance.
  */
-public class CompanionTeamCoordinationGoal extends TargetGoal {
+public class CompanionDefendTeammatesGoal extends TargetGoal {
 
-    private static final int CHECK_INTERVAL = 20; // Check every second
-    private static final int RECENT_HURT_THRESHOLD = 100; // 5 seconds
+    /** How often to check for teammates in danger (in ticks) */
+    private static final int CHECK_INTERVAL = 20;
+
+    /** How recent an attack must be to respond (in ticks, 100 = 5 seconds) */
+    private static final int RECENT_HURT_THRESHOLD = 100;
 
     private final CompanionEntity companion;
     private final TargetingConditions targetConditions;
 
     @Nullable
-    private LivingEntity coordinationTarget;
+    private LivingEntity attackerTarget;
     private int checkTimer;
 
-    public CompanionTeamCoordinationGoal(CompanionEntity companion) {
+    public CompanionDefendTeammatesGoal(CompanionEntity companion) {
         super(companion, false, false);
         this.companion = companion;
         this.targetConditions = TargetingConditions.forCombat()
@@ -47,25 +50,18 @@ public class CompanionTeamCoordinationGoal extends TargetGoal {
         }
         checkTimer = CHECK_INTERVAL;
 
-        // Don't coordinate when critically injured
+        // Don't defend when critically injured
         if (ModConfig.get().isEnableCriticalInjury() && companion.isCriticallyInjured()) {
             return false;
         }
 
-        // Try defend first (higher priority)
-        coordinationTarget = findDefendTarget();
-        if (coordinationTarget != null) {
-            return true;
-        }
-
-        // Try assist if no defend target
-        coordinationTarget = findAssistTarget();
-        return coordinationTarget != null;
+        attackerTarget = findDefendTarget();
+        return attackerTarget != null;
     }
 
     @Override
     public void start() {
-        companion.setTarget(coordinationTarget);
+        companion.setTarget(attackerTarget);
         super.start();
     }
 
@@ -87,13 +83,14 @@ public class CompanionTeamCoordinationGoal extends TargetGoal {
 
     @Override
     public void stop() {
-        coordinationTarget = null;
+        attackerTarget = null;
         companion.setTarget(null);
         super.stop();
     }
 
     /**
      * Finds an entity that is attacking a same-team companion.
+     *
      * @return The attacker to target, or null if none found
      */
     @Nullable
@@ -133,51 +130,6 @@ public class CompanionTeamCoordinationGoal extends TargetGoal {
             }
 
             return attacker;
-        }
-
-        return null;
-    }
-
-    /**
-     * Finds the target of a same-team companion to assist.
-     * @return The target to assist against, or null if none found
-     */
-    @Nullable
-    private LivingEntity findAssistTarget() {
-        double range = ModConfig.get().getTeamCoordinationRange();
-        AABB searchBox = companion.getBoundingBox().inflate(range);
-        List<CompanionEntity> teammates = companion.level().getEntitiesOfClass(
-                CompanionEntity.class, searchBox,
-                this::isValidTeammate
-        );
-
-        for (CompanionEntity teammate : teammates) {
-            LivingEntity target = teammate.getTarget();
-            if (target == null || !target.isAlive()) {
-                continue;
-            }
-
-            // Don't target same-team companions
-            if (companion.isOnSameTeam(target)) {
-                continue;
-            }
-
-            // Don't target owner
-            if (target.equals(companion.getOwner())) {
-                continue;
-            }
-
-            // Loop prevention: don't assist someone targeting us
-            if (target == companion) {
-                continue;
-            }
-
-            // Verify we can actually target this entity
-            if (!targetConditions.test(companion, target)) {
-                continue;
-            }
-
-            return target;
         }
 
         return null;

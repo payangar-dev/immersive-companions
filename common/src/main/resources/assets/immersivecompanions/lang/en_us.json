@@ -25,5 +25,14 @@
     "chat.immersivecompanions.recruited.9": "<%s> You have my sword. And my loyalty.",
     "chat.immersivecompanions.recruited.10": "<%s> A new adventure begins! I'm ready when you are.",
     "chat.immersivecompanions.recruited.11": "<%s> I swear to protect you. On my honor.",
-    "chat.immersivecompanions.recruited.12": "<%s> Good. I was getting bored guarding this village anyway."
+    "chat.immersivecompanions.recruited.12": "<%s> Good. I was getting bored guarding this village anyway.",
+
+    "stance.immersivecompanions.passive": "Passive",
+    "stance.immersivecompanions.passive.desc": "Never attacks. Flees when threatened.",
+    "stance.immersivecompanions.defensive": "Defensive",
+    "stance.immersivecompanions.defensive.desc": "Only retaliates when attacked.",
+    "stance.immersivecompanions.assist": "Assist",
+    "stance.immersivecompanions.assist.desc": "Assists owner and teammates in combat.",
+    "stance.immersivecompanions.aggressive": "Aggressive",
+    "stance.immersivecompanions.aggressive.desc": "Actively seeks out threats."
 }

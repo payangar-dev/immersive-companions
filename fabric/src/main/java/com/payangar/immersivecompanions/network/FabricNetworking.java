@@ -90,6 +90,9 @@ public class FabricNetworking implements ModNetworking {
                             companion.setCompanionTeam("player_" + player.getUUID().toString());
                             companion.setMode(CompanionModes.FOLLOW);
                             companion.clearInteractingPlayer();
+
+                            // Send recruitment message to the player
+                            companion.sendRecruitmentMessage(player);
                         }
                     });
                 }

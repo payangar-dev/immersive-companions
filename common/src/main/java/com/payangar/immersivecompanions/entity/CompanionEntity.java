@@ -469,6 +469,34 @@ public class CompanionEntity extends PathfinderMob implements RangedAttackMob {
         return this.ownerUUID != null && this.ownerUUID.equals(player.getUUID());
     }
 
+    /** Number of different recruitment messages available */
+    private static final int RECRUITMENT_MESSAGE_COUNT = 12;
+
+    /**
+     * Sends a random recruitment message to the specified player.
+     * Called when a companion is successfully recruited.
+     *
+     * @param player The player to send the message to
+     */
+    public void sendRecruitmentMessage(Player player) {
+        if (this.level().isClientSide) {
+            return;
+        }
+
+        // Pick a random message (1-12)
+        int messageIndex = this.getRandom().nextInt(RECRUITMENT_MESSAGE_COUNT) + 1;
+        String companionName = this.getDisplayName().getString();
+
+        // Create the chat message with companion's name
+        net.minecraft.network.chat.Component message = net.minecraft.network.chat.Component.translatable(
+                "chat.immersivecompanions.recruited." + messageIndex,
+                companionName
+        );
+
+        // Send only to this player (system message)
+        player.sendSystemMessage(message);
+    }
+
     /**
      * Sets the player currently interacting with this companion.
      * Called when a player opens the recruitment screen.

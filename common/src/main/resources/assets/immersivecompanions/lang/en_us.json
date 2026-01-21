@@ -12,5 +12,18 @@
     "gui.immersivecompanions.recruitment.dialogue": "I'll guard your back if you make it worth my while...",
     "gui.immersivecompanions.recruitment.price": "Price:",
     "gui.immersivecompanions.recruitment.deny": "Deny",
-    "gui.immersivecompanions.recruitment.recruit": "Recruit"
+    "gui.immersivecompanions.recruitment.recruit": "Recruit",
+
+    "chat.immersivecompanions.recruited.1": "<%s> You won't regret this. Let's go!",
+    "chat.immersivecompanions.recruited.2": "<%s> Finally, a worthy employer. Lead the way.",
+    "chat.immersivecompanions.recruited.3": "<%s> My blade is yours now. Where do we start?",
+    "chat.immersivecompanions.recruited.4": "<%s> A fair deal. I'll watch your back out there.",
+    "chat.immersivecompanions.recruited.5": "<%s> Consider me at your service. What's the plan?",
+    "chat.immersivecompanions.recruited.6": "<%s> Wise choice. Together, we'll be unstoppable.",
+    "chat.immersivecompanions.recruited.7": "<%s> I've been waiting for someone like you. Let's move.",
+    "chat.immersivecompanions.recruited.8": "<%s> The emeralds are appreciated. Now, where's the action?",
+    "chat.immersivecompanions.recruited.9": "<%s> You have my sword. And my loyalty.",
+    "chat.immersivecompanions.recruited.10": "<%s> A new adventure begins! I'm ready when you are.",
+    "chat.immersivecompanions.recruited.11": "<%s> I swear to protect you. On my honor.",
+    "chat.immersivecompanions.recruited.12": "<%s> Good. I was getting bored guarding this village anyway."
 }

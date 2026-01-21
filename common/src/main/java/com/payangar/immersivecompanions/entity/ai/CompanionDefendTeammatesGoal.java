@@ -50,8 +50,8 @@ public class CompanionDefendTeammatesGoal extends TargetGoal {
         }
         checkTimer = CHECK_INTERVAL;
 
-        // Don't defend when critically injured
-        if (ModConfig.get().isEnableCriticalInjury() && companion.isCriticallyInjured()) {
+        // Don't defend when combat is disabled by conditions
+        if (companion.isCombatDisabled()) {
             return false;
         }
 
@@ -72,8 +72,8 @@ public class CompanionDefendTeammatesGoal extends TargetGoal {
             return false;
         }
 
-        // Don't continue if critically injured
-        if (ModConfig.get().isEnableCriticalInjury() && companion.isCriticallyInjured()) {
+        // Don't continue if combat is disabled by conditions
+        if (companion.isCombatDisabled()) {
             return false;
         }
 

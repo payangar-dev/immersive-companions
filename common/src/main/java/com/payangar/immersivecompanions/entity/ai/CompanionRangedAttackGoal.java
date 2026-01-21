@@ -1,6 +1,5 @@
 package com.payangar.immersivecompanions.entity.ai;
 
-import com.payangar.immersivecompanions.config.ModConfig;
 import com.payangar.immersivecompanions.entity.CompanionEntity;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.entity.LivingEntity;
@@ -78,7 +77,8 @@ public class CompanionRangedAttackGoal extends Goal {
 
     @Override
     public boolean canUse() {
-        if (ModConfig.get().isEnableCriticalInjury() && companion.isCriticallyInjured()) {
+        // Check if combat is disabled by any condition
+        if (companion.isCombatDisabled()) {
             return false;
         }
         LivingEntity target = companion.getTarget();
@@ -90,7 +90,8 @@ public class CompanionRangedAttackGoal extends Goal {
 
     @Override
     public boolean canContinueToUse() {
-        if (ModConfig.get().isEnableCriticalInjury() && companion.isCriticallyInjured()) {
+        // Check if combat is disabled by any condition
+        if (companion.isCombatDisabled()) {
             return false;
         }
         return (canUse() || !companion.getNavigation().isDone()) && companion.canUseRangedWeapon();

@@ -5,11 +5,15 @@ import com.payangar.immersivecompanions.data.CompanionEquipment;
 import com.payangar.immersivecompanions.data.CompanionNames;
 import com.payangar.immersivecompanions.data.CompanionSkins;
 import com.payangar.immersivecompanions.data.SkinInfo;
+import com.payangar.immersivecompanions.entity.ai.CompanionFloatGoal;
 import com.payangar.immersivecompanions.entity.ai.CompanionInteractionGoal;
 import com.payangar.immersivecompanions.entity.ai.CompanionRangedAttackGoal;
 import com.payangar.immersivecompanions.entity.combat.CombatStance;
 import com.payangar.immersivecompanions.entity.combat.CombatStances;
 import com.payangar.immersivecompanions.entity.combat.TargetGoalEntry;
+import com.payangar.immersivecompanions.entity.condition.ActionType;
+import com.payangar.immersivecompanions.entity.condition.CompanionCondition;
+import com.payangar.immersivecompanions.entity.condition.CriticalInjuryCondition;
 import com.payangar.immersivecompanions.entity.mode.CompanionMode;
 import com.payangar.immersivecompanions.entity.mode.CompanionModes;
 import com.payangar.immersivecompanions.entity.mode.GoalEntry;
@@ -25,8 +29,6 @@ import net.minecraft.sounds.SoundEvents;
 import net.minecraft.world.DifficultyInstance;
 import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.entity.*;
-import net.minecraft.world.entity.ai.attributes.AttributeInstance;
-import net.minecraft.world.entity.ai.attributes.AttributeModifier;
 import net.minecraft.world.entity.ai.attributes.AttributeSupplier;
 import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.entity.ai.goal.*;
@@ -48,7 +50,11 @@ import net.minecraft.world.phys.AABB;
 
 import javax.annotation.Nullable;
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 
 public class CompanionEntity extends PathfinderMob implements RangedAttackMob {
@@ -74,10 +80,6 @@ public class CompanionEntity extends PathfinderMob implements RangedAttackMob {
 
     /** Default team for village-spawned companions */
     public static final String DEFAULT_TEAM = "village_guard";
-
-    /** Movement speed modifier ID for critical injury state */
-    private static final ResourceLocation CRITICAL_INJURY_SPEED_ID = ResourceLocation.fromNamespaceAndPath(
-            "immersivecompanions", "critical_injury_slowdown");
 
     /** Callback for post-ranged-attack events (used by Epic Fight compat for shooting animation) */
     private Runnable onRangedAttackCallback = null;
@@ -110,6 +112,14 @@ public class CompanionEntity extends PathfinderMob implements RangedAttackMob {
 
     /** List of behavior goals added by the current stance (for removal on stance change) */
     private final List<Goal> activeStanceBehaviorGoals = new ArrayList<>();
+
+    // ========== Condition System ==========
+
+    /** Set of currently active conditions affecting this companion */
+    private final Set<CompanionCondition> activeConditions = new HashSet<>();
+
+    /** Map of conditions to their registered goals (for removal when condition ends) */
+    private final Map<CompanionCondition, List<Goal>> conditionGoals = new HashMap<>();
 
     public CompanionEntity(EntityType<? extends CompanionEntity> entityType, Level level) {
         super(entityType, level);
@@ -149,8 +159,8 @@ public class CompanionEntity extends PathfinderMob implements RangedAttackMob {
         // Priority 0: Interaction - stops movement and looks at player during recruitment screen
         this.goalSelector.addGoal(0, new CompanionInteractionGoal(this));
 
-        // Priority 1: Swimming
-        this.goalSelector.addGoal(1, new FloatGoal(this));
+        // Priority 1: Swimming (uses CompanionFloatGoal which respects conditions)
+        this.goalSelector.addGoal(1, new CompanionFloatGoal(this));
 
         // Priority 1: Combat - added dynamically based on type
         // Will be set in finalizeSpawn after combat type is determined
@@ -181,18 +191,18 @@ public class CompanionEntity extends PathfinderMob implements RangedAttackMob {
             // - Will strafe and shoot while in optimal range
             this.goalSelector.addGoal(1, new CompanionRangedAttackGoal(this, 1.0, 20, 15.0F, 6.0F));
         } else {
-            // Wrap melee goal to prevent attacking when critically injured and track combat state
+            // Wrap melee goal to respect condition system and track combat state
             this.goalSelector.addGoal(1, new MeleeAttackGoal(this, 1.0, true) {
                 @Override
                 public boolean canUse() {
-                    if (ModConfig.get().isEnableCriticalInjury() && CompanionEntity.this.isCriticallyInjured()) {
+                    if (CompanionEntity.this.isCombatDisabled()) {
                         return false;
                     }
                     return super.canUse();
                 }
                 @Override
                 public boolean canContinueToUse() {
-                    if (ModConfig.get().isEnableCriticalInjury() && CompanionEntity.this.isCriticallyInjured()) {
+                    if (CompanionEntity.this.isCombatDisabled()) {
                         return false;
                     }
                     return super.canContinueToUse();
@@ -304,24 +314,30 @@ public class CompanionEntity extends PathfinderMob implements RangedAttackMob {
         return false;
     }
 
+    /**
+     * Checks if this companion is critically injured.
+     * Uses the condition system for the actual state tracking.
+     *
+     * @return true if the companion has the critical injury condition
+     */
     public boolean isCriticallyInjured() {
-        return this.entityData.get(DATA_CRITICALLY_INJURED);
+        return hasCondition(CriticalInjuryCondition.INSTANCE);
     }
 
+    /**
+     * Sets the critically injured state by adding/removing the condition.
+     * This method delegates to the condition system.
+     *
+     * @param injured true to apply the condition, false to remove it
+     */
     public void setCriticallyInjured(boolean injured) {
+        // Update synched data for client-side awareness
         this.entityData.set(DATA_CRITICALLY_INJURED, injured);
 
-        // Apply or remove movement speed penalty
-        AttributeInstance speedAttr = this.getAttribute(Attributes.MOVEMENT_SPEED);
-        if (speedAttr != null) {
-            speedAttr.removeModifier(CRITICAL_INJURY_SPEED_ID);
-            if (injured) {
-                // Create modifier based on config (e.g., 0.5 multiplier = -0.5 penalty)
-                double speedPenalty = -(1.0 - ModConfig.get().getCriticalInjurySpeedMultiplier());
-                AttributeModifier modifier = new AttributeModifier(
-                        CRITICAL_INJURY_SPEED_ID, speedPenalty, AttributeModifier.Operation.ADD_MULTIPLIED_TOTAL);
-                speedAttr.addTransientModifier(modifier);
-            }
+        if (injured) {
+            addCondition(CriticalInjuryCondition.INSTANCE);
+        } else {
+            removeCondition(CriticalInjuryCondition.INSTANCE);
         }
     }
 
@@ -473,6 +489,119 @@ public class CompanionEntity extends PathfinderMob implements RangedAttackMob {
             this.goalSelector.removeGoal(goal);
         }
         this.activeStanceBehaviorGoals.clear();
+    }
+
+    // ========== Condition System ==========
+
+    /**
+     * Adds a condition to this companion.
+     * Conditions affect what actions are possible and can add/remove goals.
+     *
+     * @param condition The condition to add
+     */
+    public void addCondition(CompanionCondition condition) {
+        if (!condition.isEnabled()) {
+            return; // Condition is disabled in config
+        }
+        if (activeConditions.add(condition)) {
+            condition.onApply(this); // Triggers goal registration and effects
+        }
+    }
+
+    /**
+     * Removes a condition from this companion.
+     *
+     * @param condition The condition to remove
+     */
+    public void removeCondition(CompanionCondition condition) {
+        if (activeConditions.remove(condition)) {
+            condition.onRemove(this); // Triggers goal removal and cleanup
+        }
+    }
+
+    /**
+     * Checks if this companion has a specific condition.
+     *
+     * @param condition The condition to check
+     * @return true if the condition is active
+     */
+    public boolean hasCondition(CompanionCondition condition) {
+        return activeConditions.contains(condition);
+    }
+
+    /**
+     * Registers goals provided by a condition.
+     * Called by conditions in their onApply() method.
+     *
+     * @param condition The condition registering goals
+     */
+    public void registerConditionGoals(CompanionCondition condition) {
+        List<Goal> goals = new ArrayList<>();
+
+        // Add behavior goals
+        for (GoalEntry entry : condition.getBehaviorGoals()) {
+            Goal goal = entry.factory().apply(this);
+            this.goalSelector.addGoal(entry.priority(), goal);
+            goals.add(goal);
+        }
+
+        // Add target goals
+        for (com.payangar.immersivecompanions.entity.combat.TargetGoalEntry entry : condition.getTargetGoals()) {
+            Goal goal = entry.factory().apply(this);
+            this.targetSelector.addGoal(entry.priority(), goal);
+            goals.add(goal);
+        }
+
+        conditionGoals.put(condition, goals);
+    }
+
+    /**
+     * Removes goals registered by a condition.
+     * Called by conditions in their onRemove() method.
+     *
+     * @param condition The condition whose goals should be removed
+     */
+    public void removeConditionGoals(CompanionCondition condition) {
+        List<Goal> goals = conditionGoals.remove(condition);
+        if (goals != null) {
+            for (Goal goal : goals) {
+                this.goalSelector.removeGoal(goal);
+                this.targetSelector.removeGoal(goal);
+            }
+        }
+    }
+
+    /**
+     * Checks if a basic action can be performed.
+     * Actions are blocked by conditions that list them in getBlockedActions().
+     *
+     * @param action The action type to check
+     * @return true if the action can be performed
+     */
+    public boolean canPerformAction(ActionType action) {
+        return activeConditions.stream()
+                .noneMatch(c -> c.getBlockedActions().contains(action));
+    }
+
+    /**
+     * Checks if combat is disabled by any active condition.
+     * Used by combat goals to check if they should run.
+     *
+     * @return true if combat is disabled
+     */
+    public boolean isCombatDisabled() {
+        return activeConditions.stream()
+                .anyMatch(CompanionCondition::disablesCombat);
+    }
+
+    /**
+     * Checks if the companion should be forced to crouch by any condition.
+     *
+     * @return true if crouching should be forced
+     */
+    public boolean shouldForceCrouch() {
+        return activeConditions.stream()
+                .anyMatch(CompanionCondition::forcesCrouching);
     }
 
     // ========== Owner System ==========
@@ -799,26 +928,32 @@ public class CompanionEntity extends PathfinderMob implements RangedAttackMob {
                 }
             }
 
+            // Tick active conditions
+            for (CompanionCondition condition : activeConditions) {
+                condition.tick(this);
+            }
+
             // Mode tick
             this.currentMode.tick(this);
         }
-    }
 
-    @Override
-    public void setPose(Pose pose) {
-        // Force crouching when critically injured (except for dying/sleeping)
-        if (ModConfig.get().isEnableCriticalInjury() && this.isCriticallyInjured()
-                && pose != Pose.DYING && pose != Pose.SLEEPING) {
-            super.setPose(Pose.CROUCHING);
-        } else {
-            super.setPose(pose);
+        // Handle forced crouching from conditions (runs on both sides for rendering)
+        // NOTE: Only FORCES crouch when conditions require it.
+        // Clearing crouch is the responsibility of whoever set it:
+        // - When condition is removed → condition's onRemove clears it
+        // - MimicOwnerGoal manages owner-based crouching separately
+        if (shouldForceCrouch()) {
+            this.setShiftKeyDown(true);
+            if (this.getPose() != Pose.DYING && this.getPose() != Pose.SLEEPING) {
+                this.setPose(Pose.CROUCHING);
+            }
         }
     }
 
     @Override
     public void jumpFromGround() {
-        // Disable jumping when critically injured
-        if (ModConfig.get().isEnableCriticalInjury() && this.isCriticallyInjured()) {
+        // Disable jumping when blocked by a condition
+        if (!canPerformAction(ActionType.JUMP)) {
             return;
         }
         super.jumpFromGround();

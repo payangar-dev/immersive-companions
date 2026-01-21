@@ -47,8 +47,8 @@ public class CompanionAssistOwnerGoal extends TargetGoal {
         }
         checkTimer = CHECK_INTERVAL;
 
-        // Don't assist when critically injured
-        if (ModConfig.get().isEnableCriticalInjury() && companion.isCriticallyInjured()) {
+        // Don't assist when combat is disabled by conditions
+        if (companion.isCombatDisabled()) {
             return false;
         }
 
@@ -69,8 +69,8 @@ public class CompanionAssistOwnerGoal extends TargetGoal {
             return false;
         }
 
-        // Don't continue if critically injured
-        if (ModConfig.get().isEnableCriticalInjury() && companion.isCriticallyInjured()) {
+        // Don't continue if combat is disabled by conditions
+        if (companion.isCombatDisabled()) {
             return false;
         }
 

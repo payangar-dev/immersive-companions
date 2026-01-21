@@ -47,8 +47,8 @@ public class CompanionTeamCoordinationGoal extends TargetGoal {
         }
         checkTimer = CHECK_INTERVAL;
 
-        // Don't coordinate when critically injured
-        if (ModConfig.get().isEnableCriticalInjury() && companion.isCriticallyInjured()) {
+        // Don't coordinate when combat is disabled by conditions
+        if (companion.isCombatDisabled()) {
             return false;
         }
 
@@ -76,8 +76,8 @@ public class CompanionTeamCoordinationGoal extends TargetGoal {
             return false;
         }
 
-        // Don't continue if critically injured
-        if (ModConfig.get().isEnableCriticalInjury() && companion.isCriticallyInjured()) {
+        // Don't continue if combat is disabled by conditions
+        if (companion.isCombatDisabled()) {
             return false;
         }
 

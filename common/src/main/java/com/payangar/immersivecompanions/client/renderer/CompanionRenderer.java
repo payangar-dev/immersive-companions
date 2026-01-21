@@ -95,4 +95,10 @@ public class CompanionRenderer extends HumanoidMobRenderer<CompanionEntity, Play
     public ResourceLocation getTextureLocation(CompanionEntity entity) {
         return entity.getSkinTexture();
     }
+
+    @Override
+    protected void scale(CompanionEntity entity, PoseStack poseStack, float partialTick) {
+        float scale = CompanionEntity.RENDER_SCALE;
+        poseStack.scale(scale, scale, scale);
+    }
 }

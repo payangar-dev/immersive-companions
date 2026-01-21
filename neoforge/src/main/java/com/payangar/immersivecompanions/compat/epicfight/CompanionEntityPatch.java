@@ -5,6 +5,7 @@ import com.payangar.immersivecompanions.entity.CompanionEntity;
 import net.minecraft.world.InteractionHand;
 import yesman.epicfight.api.animation.Animator;
 import yesman.epicfight.api.animation.LivingMotions;
+import yesman.epicfight.api.utils.math.OpenMatrix4f;
 import yesman.epicfight.gameasset.Animations;
 import yesman.epicfight.model.armature.types.ToolHolderArmature;
 import yesman.epicfight.world.capabilities.entitypatch.Factions;
@@ -48,6 +49,14 @@ public class CompanionEntityPatch extends HumanoidMobPatch<CompanionEntity> {
 
         // Note: Ranged animations (AIM, SHOT, RELOAD) come from weapon capabilities
         // via modifyLivingMotionByCurrentItem() inherited from HumanoidMobPatch
+    }
+
+    @Override
+    public OpenMatrix4f getModelMatrix(float partialTicks) {
+        OpenMatrix4f matrix = super.getModelMatrix(partialTicks);
+        // Apply scale correction to match player size
+        float scale = CompanionEntity.RENDER_SCALE;
+        return matrix.scale(scale, scale, scale);
     }
 
     @Override

@@ -59,6 +59,9 @@ import java.util.UUID;
 
 public class CompanionEntity extends PathfinderMob implements RangedAttackMob {
 
+    /** Scale factor to match player size (15/16 = 0.9375) */
+    public static final float RENDER_SCALE = 0.9375F;
+
     private static final EntityDataAccessor<Integer> DATA_GENDER = SynchedEntityData.defineId(
             CompanionEntity.class, EntityDataSerializers.INT);
     private static final EntityDataAccessor<Integer> DATA_COMBAT_TYPE = SynchedEntityData.defineId(

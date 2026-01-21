@@ -2,6 +2,7 @@ package com.payangar.immersivecompanions.entity.mode;
 
 import com.payangar.immersivecompanions.entity.CompanionEntity;
 import com.payangar.immersivecompanions.entity.ai.CompanionFollowOwnerGoal;
+import com.payangar.immersivecompanions.entity.ai.CompanionMimicOwnerGoal;
 
 import java.util.List;
 
@@ -23,6 +24,7 @@ public final class FollowMode implements CompanionMode {
     @Override
     public List<GoalEntry> getGoals() {
         return List.of(
+                new GoalEntry(4, CompanionMimicOwnerGoal::new),
                 new GoalEntry(6, c -> new CompanionFollowOwnerGoal(c, 1.0))
         );
     }

@@ -58,9 +58,8 @@ public class CompanionEntityPatch extends HumanoidMobPatch<CompanionEntity> {
             return;
         }
 
-        // Check for critical injury state (if enabled)
-        if (ModConfig.get().isEnableCriticalInjury() && this.original.isCriticallyInjured()) {
-            // Use SNEAK animation when moving, KNEEL when stationary
+        // Handle crouching state (from any source: critical injury, owner mimic, etc.)
+        if (this.original.isCrouching()) {
             if (this.original.walkAnimation.speed() > 0.01F) {
                 this.currentLivingMotion = LivingMotions.SNEAK;
             } else {

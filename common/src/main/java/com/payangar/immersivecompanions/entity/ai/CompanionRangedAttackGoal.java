@@ -94,29 +94,14 @@ public class CompanionRangedAttackGoal extends Goal {
 
     @Override
     public boolean canContinueToUse() {
-        // Stop if switched to melee
-        if (!companion.getCombatType().isRanged()) {
-            return false;
-        }
-        // Check if combat is disabled by any condition
-        if (companion.isCombatDisabled()) {
-            return false;
-        }
-        return (this.canUseWithoutCombatCheck() || !companion.getNavigation().isDone()) && companion.canUseRangedWeapon();
-    }
+        // Core prerequisites that must always be met
+        if (!companion.getCombatType().isRanged()) return false;
+        if (companion.isCombatDisabled()) return false;
+        if (!companion.canUseRangedWeapon()) return false;
 
-    /**
-     * Helper to check canUse conditions without re-checking combat disabled (for canContinueToUse).
-     */
-    private boolean canUseWithoutCombatCheck() {
-        if (!companion.getCombatType().isRanged()) {
-            return false;
-        }
+        // Continue if target is valid, OR if still navigating to last known position
         LivingEntity target = companion.getTarget();
-        if (target == null || !target.isAlive()) {
-            return false;
-        }
-        return companion.canUseRangedWeapon();
+        return (target != null && target.isAlive()) || !companion.getNavigation().isDone();
     }
 
     @Override

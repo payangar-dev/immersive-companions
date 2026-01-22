@@ -12,7 +12,7 @@ import java.util.EnumSet;
 
 /**
  * AI goal that makes companions flee from their most recent attacker.
- * Used by the Passive combat stance.
+ * Active when the companion should flee (passive stance or critically injured).
  *
  * <p>The companion will flee for a configurable duration after being attacked,
  * then stop fleeing if no new attacks occur.
@@ -43,6 +43,11 @@ public class CompanionFleeFromAttackerGoal extends Goal {
 
     @Override
     public boolean canUse() {
+        // Only flee when companion should flee (passive stance or critically injured)
+        if (!companion.shouldFlee()) {
+            return false;
+        }
+
         LivingEntity lastAttacker = companion.getLastHurtByMob();
         if (lastAttacker == null || !lastAttacker.isAlive()) {
             return false;
@@ -65,6 +70,11 @@ public class CompanionFleeFromAttackerGoal extends Goal {
 
     @Override
     public boolean canContinueToUse() {
+        // Stop fleeing if no longer in flee state
+        if (!companion.shouldFlee()) {
+            return false;
+        }
+
         if (attacker == null || !attacker.isAlive()) {
             return false;
         }

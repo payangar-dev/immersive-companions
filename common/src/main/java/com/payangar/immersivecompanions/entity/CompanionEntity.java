@@ -5,18 +5,12 @@ import com.payangar.immersivecompanions.data.CompanionEquipment;
 import com.payangar.immersivecompanions.data.CompanionNames;
 import com.payangar.immersivecompanions.data.CompanionSkins;
 import com.payangar.immersivecompanions.data.SkinInfo;
-import com.payangar.immersivecompanions.entity.ai.CompanionFloatGoal;
-import com.payangar.immersivecompanions.entity.ai.CompanionInteractionGoal;
-import com.payangar.immersivecompanions.entity.ai.CompanionRangedAttackGoal;
+import com.payangar.immersivecompanions.entity.ai.*;
 import com.payangar.immersivecompanions.entity.combat.CombatStance;
-import com.payangar.immersivecompanions.entity.combat.CombatStances;
-import com.payangar.immersivecompanions.entity.combat.TargetGoalEntry;
 import com.payangar.immersivecompanions.entity.condition.ActionType;
 import com.payangar.immersivecompanions.entity.condition.CompanionCondition;
 import com.payangar.immersivecompanions.entity.condition.CriticalInjuryCondition;
 import com.payangar.immersivecompanions.entity.mode.CompanionMode;
-import com.payangar.immersivecompanions.entity.mode.CompanionModes;
-import com.payangar.immersivecompanions.entity.mode.GoalEntry;
 import com.payangar.immersivecompanions.network.ModNetworking;
 import com.payangar.immersivecompanions.recruitment.CompanionPricing;
 import net.minecraft.nbt.CompoundTag;
@@ -51,11 +45,8 @@ import net.minecraft.world.entity.ai.navigation.GroundPathNavigation;
 import net.minecraft.world.phys.AABB;
 
 import javax.annotation.Nullable;
-import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
@@ -117,35 +108,15 @@ public class CompanionEntity extends PathfinderMob implements RangedAttackMob {
     private UUID ownerUUID = null;
 
     /** Current behavioral mode */
-    private CompanionMode currentMode = CompanionModes.WANDER;
-
-    /** List of goals added by the current mode (for removal on mode change) */
-    private final List<Goal> activeModeGoals = new ArrayList<>();
+    private CompanionMode currentMode = CompanionMode.WANDER;
 
     /** Current combat stance controlling targeting behavior */
-    private CombatStance currentStance = CombatStances.AGGRESSIVE;
-
-    /**
-     * List of target goals added by the current stance (for removal on stance
-     * change)
-     */
-    private final List<Goal> activeStanceTargetGoals = new ArrayList<>();
-
-    /**
-     * List of behavior goals added by the current stance (for removal on stance
-     * change)
-     */
-    private final List<Goal> activeStanceBehaviorGoals = new ArrayList<>();
+    private CombatStance currentStance = CombatStance.AGGRESSIVE;
 
     // ========== Condition System ==========
 
     /** Set of currently active conditions affecting this companion */
     private final Set<CompanionCondition> activeConditions = new HashSet<>();
-
-    /**
-     * Map of conditions to their registered goals (for removal when condition ends)
-     */
-    private final Map<CompanionCondition, List<Goal>> conditionGoals = new HashMap<>();
 
     public CompanionEntity(EntityType<? extends CompanionEntity> entityType, Level level) {
         super(entityType, level);
@@ -176,79 +147,66 @@ public class CompanionEntity extends PathfinderMob implements RangedAttackMob {
         builder.define(DATA_TEAM, DEFAULT_TEAM);
         builder.define(DATA_CRITICALLY_INJURED, false);
         builder.define(DATA_BASE_PRICE, 0);
-        builder.define(DATA_MODE_ID, CompanionModes.WANDER.getId());
-        builder.define(DATA_COMBAT_STANCE, CombatStances.AGGRESSIVE.getId());
+        builder.define(DATA_MODE_ID, CompanionMode.WANDER.getId());
+        builder.define(DATA_COMBAT_STANCE, CombatStance.AGGRESSIVE.getId());
     }
 
     @Override
     protected void registerGoals() {
-        // Priority 0: Interaction - stops movement and looks at player during
-        // recruitment screen
+        // ========== BEHAVIOR GOALS ==========
+        // All goals are registered once; they use canUse()/canContinueToUse() to
+        // determine when to run based on mode, stance, and conditions.
+
+        // Priority 0: Interaction - stops movement and looks at player during recruitment screen
         this.goalSelector.addGoal(0, new CompanionInteractionGoal(this));
 
-        // Priority 1: Swimming (uses CompanionFloatGoal which respects conditions)
+        // Priority 1: Swimming (respects conditions via CompanionFloatGoal)
         this.goalSelector.addGoal(1, new CompanionFloatGoal(this));
 
-        // Priority 1: Combat - added dynamically based on type
-        // Will be set in finalizeSpawn after combat type is determined
+        // Priority 1: Flee from attackers (active when shouldFlee() returns true)
+        this.goalSelector.addGoal(1, new CompanionFleeFromAttackerGoal(this));
+
+        // Priority 1: Combat goals - both registered, but check combat type in canUse()
+        this.goalSelector.addGoal(1, new CompanionMeleeAttackGoal(this, 1.0, true));
+        this.goalSelector.addGoal(1, new CompanionRangedAttackGoal(this, 1.0, 20, 15.0F, 6.0F));
 
         // Priority 3: Door interaction (like villagers)
         this.goalSelector.addGoal(3, new OpenDoorGoal(this, true));
 
+        // Priority 4: Mimic owner's sneaking (active in FOLLOW mode)
+        this.goalSelector.addGoal(4, new CompanionMimicOwnerGoal(this));
+
         // Priority 5: Village binding
         this.goalSelector.addGoal(5, new MoveTowardsRestrictionGoal(this, 1.0));
 
-        // Priority 6: Mode-specific goals are added dynamically via setMode()
+        // Priority 6: Movement goals - both registered, check mode in canUse()
+        this.goalSelector.addGoal(6, new CompanionFollowOwnerGoal(this, 1.0));
+        this.goalSelector.addGoal(6, new CompanionWaterAvoidingRandomStrollGoal(this, 0.9));
 
         // Priority 7-8: Looking around
         this.goalSelector.addGoal(7, new LookAtPlayerGoal(this, Player.class, 8.0F));
         this.goalSelector.addGoal(8, new RandomLookAroundGoal(this));
 
-        // Target goals are added dynamically via setCombatStance()
-        // based on the companion's current combat stance
-    }
+        // ========== TARGET GOALS ==========
+        // All target goals use canUse() checks based on stance.
 
-    private void registerCombatGoals() {
-        // Remove any existing combat goals first
-        if (getCombatType().isRanged()) {
-            // Use custom ranged attack goal with charging animation and kiting behavior
-            // Parameters: companion, speedModifier, attackInterval, maxRange, minRange
-            // - Will approach targets beyond maxRange (15 blocks)
-            // - Will retreat from targets closer than minRange (6 blocks)
-            // - Will strafe and shoot while in optimal range
-            this.goalSelector.addGoal(1, new CompanionRangedAttackGoal(this, 1.0, 20, 15.0F, 6.0F));
-        } else {
-            // Wrap melee goal to respect condition system and track combat state
-            this.goalSelector.addGoal(1, new MeleeAttackGoal(this, 1.0, true) {
-                @Override
-                public boolean canUse() {
-                    if (CompanionEntity.this.isCombatDisabled()) {
-                        return false;
-                    }
-                    return super.canUse();
-                }
+        // Priority 2: Retaliate when hurt (active when canRetaliate() returns true)
+        this.targetSelector.addGoal(2, new CompanionHurtByTargetGoal(this));
 
-                @Override
-                public boolean canContinueToUse() {
-                    if (CompanionEntity.this.isCombatDisabled()) {
-                        return false;
-                    }
-                    return super.canContinueToUse();
-                }
+        // Priority 3: Defend teammates (active when canDefendTeammates() returns true)
+        this.targetSelector.addGoal(3, new CompanionDefendTeammatesGoal(this));
 
-                @Override
-                public void start() {
-                    super.start();
-                    CompanionEntity.this.setAggressive(true);
-                }
+        // Priority 3: Team coordination - defend and assist (active when canAssistTeammates() returns true)
+        this.targetSelector.addGoal(3, new CompanionTeamCoordinationGoal(this));
 
-                @Override
-                public void stop() {
-                    super.stop();
-                    CompanionEntity.this.setAggressive(false);
-                }
-            });
-        }
+        // Priority 4: Assist owner (active when canAssistOwner() returns true)
+        this.targetSelector.addGoal(4, new CompanionAssistOwnerGoal(this));
+
+        // Priority 5: Proactively attack monsters (active when canProactivelyAttack() returns true)
+        this.targetSelector.addGoal(5, new CompanionNearestAttackableTargetGoal(this));
+
+        // Priority 6: Defend village (active when canDefendVillage() returns true)
+        this.targetSelector.addGoal(6, new CompanionDefendVillageGoal(this));
     }
 
     @Nullable
@@ -266,9 +224,6 @@ public class CompanionEntity extends PathfinderMob implements RangedAttackMob {
         setCombatType(combatType);
         setSkinIndex(skinIndex);
 
-        // Register combat goals after type is determined
-        registerCombatGoals();
-
         // Equip based on combat type
         CompanionEquipment.equipCompanion(this, combatType, level.getRandom());
 
@@ -277,12 +232,6 @@ public class CompanionEntity extends PathfinderMob implements RangedAttackMob {
 
         // Set random name (custom names are always visible for mobs)
         this.setCustomName(CompanionNames.generateName(gender, level.getRandom()));
-
-        // Initialize default mode (wander for newly spawned companions)
-        registerModeGoals(CompanionModes.WANDER);
-
-        // Initialize default combat stance (aggressive for unowned companions)
-        registerStanceGoals(CombatStances.AGGRESSIVE);
 
         return spawnData;
     }
@@ -399,8 +348,22 @@ public class CompanionEntity extends PathfinderMob implements RangedAttackMob {
     }
 
     /**
-     * Sets the behavioral mode, handling goal transitions.
-     * Removes goals from the old mode and adds goals from the new mode.
+     * Checks if the companion is in WANDER mode.
+     */
+    public boolean isInWanderMode() {
+        return this.currentMode == CompanionMode.WANDER;
+    }
+
+    /**
+     * Checks if the companion is in FOLLOW mode.
+     */
+    public boolean isInFollowMode() {
+        return this.currentMode == CompanionMode.FOLLOW;
+    }
+
+    /**
+     * Sets the behavioral mode.
+     * Goals check the mode in their canUse() methods, so no goal manipulation needed.
      *
      * @param mode The new mode to set
      */
@@ -409,41 +372,8 @@ public class CompanionEntity extends PathfinderMob implements RangedAttackMob {
             return;
         }
 
-        // Check if transition is allowed
-        if (!this.currentMode.canTransitionTo(mode, this)) {
-            return;
-        }
-
-        // Exit old mode
-        this.currentMode.onExit(this);
-        removeModeGoals();
-
-        // Enter new mode
         this.currentMode = mode;
         this.entityData.set(DATA_MODE_ID, mode.getId());
-        registerModeGoals(mode);
-        this.currentMode.onEnter(this);
-    }
-
-    /**
-     * Registers goals from a mode.
-     */
-    private void registerModeGoals(CompanionMode mode) {
-        for (GoalEntry entry : mode.getGoals()) {
-            Goal goal = entry.factory().apply(this);
-            this.goalSelector.addGoal(entry.priority(), goal);
-            this.activeModeGoals.add(goal);
-        }
-    }
-
-    /**
-     * Removes all goals added by the current mode.
-     */
-    private void removeModeGoals() {
-        for (Goal goal : this.activeModeGoals) {
-            this.goalSelector.removeGoal(goal);
-        }
-        this.activeModeGoals.clear();
     }
 
     // ========== Combat Stance System ==========
@@ -458,8 +388,81 @@ public class CompanionEntity extends PathfinderMob implements RangedAttackMob {
     }
 
     /**
-     * Sets the combat stance, handling target goal transitions.
-     * Removes goals from the old stance and adds goals from the new stance.
+     * Checks if the companion is in PASSIVE stance.
+     */
+    public boolean isPassive() {
+        return this.currentStance == CombatStance.PASSIVE;
+    }
+
+    /**
+     * Checks if the companion can retaliate when attacked.
+     * True for DEFENSIVE, ASSIST, and AGGRESSIVE stances when not combat disabled.
+     */
+    public boolean canRetaliate() {
+        return !isPassive() && !isCombatDisabled();
+    }
+
+    /**
+     * Checks if the companion can defend teammates under attack.
+     * True for DEFENSIVE, ASSIST, and AGGRESSIVE stances when not combat disabled.
+     */
+    public boolean canDefendTeammates() {
+        return !isPassive() && !isCombatDisabled();
+    }
+
+    /**
+     * Checks if the companion can assist teammates in attacking.
+     * True for ASSIST and AGGRESSIVE stances when not combat disabled.
+     */
+    public boolean canAssistTeammates() {
+        return (this.currentStance == CombatStance.ASSIST || this.currentStance == CombatStance.AGGRESSIVE)
+                && !isCombatDisabled();
+    }
+
+    /**
+     * Checks if the companion can assist their owner in attacking.
+     * True for ASSIST and AGGRESSIVE stances when not combat disabled.
+     */
+    public boolean canAssistOwner() {
+        return (this.currentStance == CombatStance.ASSIST || this.currentStance == CombatStance.AGGRESSIVE)
+                && !isCombatDisabled();
+    }
+
+    /**
+     * Checks if the companion can proactively attack monsters.
+     * True only for AGGRESSIVE stance when not combat disabled.
+     */
+    public boolean canProactivelyAttack() {
+        return this.currentStance == CombatStance.AGGRESSIVE && !isCombatDisabled();
+    }
+
+    /**
+     * Checks if the companion should flee from attackers.
+     * True when in PASSIVE stance or critically injured.
+     */
+    public boolean shouldFlee() {
+        return isPassive() || isCriticallyInjured();
+    }
+
+    /**
+     * Checks if the companion can defend the village from hostile players.
+     * True when in AGGRESSIVE stance, not combat disabled, and in a villager team.
+     */
+    public boolean canDefendVillage() {
+        return canProactivelyAttack() && isInVillagerTeam();
+    }
+
+    /**
+     * Checks if this companion is in the default villager team.
+     * Used to determine if they should defend villages.
+     */
+    public boolean isInVillagerTeam() {
+        return DEFAULT_TEAM.equals(getCompanionTeam());
+    }
+
+    /**
+     * Sets the combat stance.
+     * Goals check the stance in their canUse() methods, so no goal manipulation needed.
      *
      * @param stance The new stance to set
      */
@@ -468,56 +471,20 @@ public class CompanionEntity extends PathfinderMob implements RangedAttackMob {
             return;
         }
 
-        // Exit old stance
-        this.currentStance.onExit(this);
-        removeStanceGoals();
-
-        // Enter new stance
         this.currentStance = stance;
         this.entityData.set(DATA_COMBAT_STANCE, stance.getId());
-        registerStanceGoals(stance);
-        this.currentStance.onEnter(this);
-    }
 
-    /**
-     * Registers goals from a stance.
-     */
-    private void registerStanceGoals(CombatStance stance) {
-        // Register target goals
-        for (TargetGoalEntry entry : stance.getTargetGoals()) {
-            Goal goal = entry.factory().apply(this);
-            this.targetSelector.addGoal(entry.priority(), goal);
-            this.activeStanceTargetGoals.add(goal);
+        // Clear target when entering PASSIVE stance
+        if (stance == CombatStance.PASSIVE) {
+            this.setTarget(null);
         }
-
-        // Register behavior goals
-        for (GoalEntry entry : stance.getBehaviorGoals()) {
-            Goal goal = entry.factory().apply(this);
-            this.goalSelector.addGoal(entry.priority(), goal);
-            this.activeStanceBehaviorGoals.add(goal);
-        }
-    }
-
-    /**
-     * Removes all goals added by the current stance.
-     */
-    private void removeStanceGoals() {
-        for (Goal goal : this.activeStanceTargetGoals) {
-            this.targetSelector.removeGoal(goal);
-        }
-        this.activeStanceTargetGoals.clear();
-
-        for (Goal goal : this.activeStanceBehaviorGoals) {
-            this.goalSelector.removeGoal(goal);
-        }
-        this.activeStanceBehaviorGoals.clear();
     }
 
     // ========== Condition System ==========
 
     /**
      * Adds a condition to this companion.
-     * Conditions affect what actions are possible and can add/remove goals.
+     * Conditions affect what actions are possible.
      *
      * @param condition The condition to add
      */
@@ -526,7 +493,7 @@ public class CompanionEntity extends PathfinderMob implements RangedAttackMob {
             return; // Condition is disabled in config
         }
         if (activeConditions.add(condition)) {
-            condition.onApply(this); // Triggers goal registration and effects
+            condition.onApply(this);
         }
     }
 
@@ -537,7 +504,7 @@ public class CompanionEntity extends PathfinderMob implements RangedAttackMob {
      */
     public void removeCondition(CompanionCondition condition) {
         if (activeConditions.remove(condition)) {
-            condition.onRemove(this); // Triggers goal removal and cleanup
+            condition.onRemove(this);
         }
     }
 
@@ -549,48 +516,6 @@ public class CompanionEntity extends PathfinderMob implements RangedAttackMob {
      */
     public boolean hasCondition(CompanionCondition condition) {
         return activeConditions.contains(condition);
-    }
-
-    /**
-     * Registers goals provided by a condition.
-     * Called by conditions in their onApply() method.
-     *
-     * @param condition The condition registering goals
-     */
-    public void registerConditionGoals(CompanionCondition condition) {
-        List<Goal> goals = new ArrayList<>();
-
-        // Add behavior goals
-        for (GoalEntry entry : condition.getBehaviorGoals()) {
-            Goal goal = entry.factory().apply(this);
-            this.goalSelector.addGoal(entry.priority(), goal);
-            goals.add(goal);
-        }
-
-        // Add target goals
-        for (com.payangar.immersivecompanions.entity.combat.TargetGoalEntry entry : condition.getTargetGoals()) {
-            Goal goal = entry.factory().apply(this);
-            this.targetSelector.addGoal(entry.priority(), goal);
-            goals.add(goal);
-        }
-
-        conditionGoals.put(condition, goals);
-    }
-
-    /**
-     * Removes goals registered by a condition.
-     * Called by conditions in their onRemove() method.
-     *
-     * @param condition The condition whose goals should be removed
-     */
-    public void removeConditionGoals(CompanionCondition condition) {
-        List<Goal> goals = conditionGoals.remove(condition);
-        if (goals != null) {
-            for (Goal goal : goals) {
-                this.goalSelector.removeGoal(goal);
-                this.targetSelector.removeGoal(goal);
-            }
-        }
     }
 
     /**
@@ -816,7 +741,6 @@ public class CompanionEntity extends PathfinderMob implements RangedAttackMob {
         }
         if (tag.contains("CombatType")) {
             setCombatType(CompanionType.values()[tag.getInt("CombatType")]);
-            registerCombatGoals();
         }
         if (tag.contains("SkinIndex")) {
             setSkinIndex(tag.getInt("SkinIndex"));
@@ -838,21 +762,12 @@ public class CompanionEntity extends PathfinderMob implements RangedAttackMob {
             CompanionMode mode = CompanionMode.byId(modeId);
             this.currentMode = mode;
             this.entityData.set(DATA_MODE_ID, mode.getId());
-            registerModeGoals(mode);
-        } else {
-            // Default: register wander mode goals for entities without saved mode
-            registerModeGoals(CompanionModes.WANDER);
         }
-
         if (tag.contains("CombatStance")) {
             String stanceId = tag.getString("CombatStance");
             CombatStance stance = CombatStance.byId(stanceId);
             this.currentStance = stance;
             this.entityData.set(DATA_COMBAT_STANCE, stance.getId());
-            registerStanceGoals(stance);
-        } else {
-            // Default: register aggressive stance goals for entities without saved stance
-            registerStanceGoals(CombatStances.AGGRESSIVE);
         }
     }
 
@@ -985,9 +900,6 @@ public class CompanionEntity extends PathfinderMob implements RangedAttackMob {
             for (CompanionCondition condition : activeConditions) {
                 condition.tick(this);
             }
-
-            // Mode tick
-            this.currentMode.tick(this);
         }
     }
 

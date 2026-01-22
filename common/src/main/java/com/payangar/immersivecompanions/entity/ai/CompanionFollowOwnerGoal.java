@@ -1,6 +1,7 @@
 package com.payangar.immersivecompanions.entity.ai;
 
 import com.payangar.immersivecompanions.entity.CompanionEntity;
+import com.payangar.immersivecompanions.entity.mode.CompanionMode;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.ai.goal.Goal;
@@ -14,6 +15,7 @@ import java.util.EnumSet;
 /**
  * AI goal that makes owned companions follow their owner.
  * Includes teleportation when the owner gets too far away.
+ * Only active when the companion is in FOLLOW mode.
  */
 public class CompanionFollowOwnerGoal extends Goal {
 
@@ -40,6 +42,10 @@ public class CompanionFollowOwnerGoal extends Goal {
 
     @Override
     public boolean canUse() {
+        // Only follow when in FOLLOW mode
+        if (companion.getMode() != CompanionMode.FOLLOW) {
+            return false;
+        }
         LivingEntity potentialOwner = getOwner();
         if (potentialOwner == null) {
             return false;
@@ -57,6 +63,10 @@ public class CompanionFollowOwnerGoal extends Goal {
 
     @Override
     public boolean canContinueToUse() {
+        // Stop following if mode changed
+        if (companion.getMode() != CompanionMode.FOLLOW) {
+            return false;
+        }
         if (navigation.isDone()) {
             return false;
         }

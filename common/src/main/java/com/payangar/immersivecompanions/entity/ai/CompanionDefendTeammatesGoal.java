@@ -15,7 +15,7 @@ import java.util.List;
  * Unlike CompanionTeamCoordinationGoal, this only defends - it does not assist
  * teammates in attacking their targets.
  *
- * <p>Used by the Defensive combat stance.
+ * <p>Active in DEFENSIVE, ASSIST, and AGGRESSIVE stances.
  */
 public class CompanionDefendTeammatesGoal extends TargetGoal {
 
@@ -41,6 +41,11 @@ public class CompanionDefendTeammatesGoal extends TargetGoal {
 
     @Override
     public boolean canUse() {
+        // Check if companion can defend teammates (not passive, not combat disabled)
+        if (!companion.canDefendTeammates()) {
+            return false;
+        }
+
         if (!ModConfig.get().isEnableTeamCoordination()) {
             return false;
         }
@@ -49,11 +54,6 @@ public class CompanionDefendTeammatesGoal extends TargetGoal {
             return false;
         }
         checkTimer = CHECK_INTERVAL;
-
-        // Don't defend when combat is disabled by conditions
-        if (companion.isCombatDisabled()) {
-            return false;
-        }
 
         attackerTarget = findDefendTarget();
         return attackerTarget != null;
@@ -67,13 +67,13 @@ public class CompanionDefendTeammatesGoal extends TargetGoal {
 
     @Override
     public boolean canContinueToUse() {
-        LivingEntity target = companion.getTarget();
-        if (target == null || !target.isAlive()) {
+        // Stop defending if stance changed
+        if (!companion.canDefendTeammates()) {
             return false;
         }
 
-        // Don't continue if combat is disabled by conditions
-        if (companion.isCombatDisabled()) {
+        LivingEntity target = companion.getTarget();
+        if (target == null || !target.isAlive()) {
             return false;
         }
 

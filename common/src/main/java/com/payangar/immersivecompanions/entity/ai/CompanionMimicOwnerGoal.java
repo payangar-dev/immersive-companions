@@ -1,12 +1,13 @@
 package com.payangar.immersivecompanions.entity.ai;
 
 import com.payangar.immersivecompanions.entity.CompanionEntity;
+import com.payangar.immersivecompanions.entity.mode.CompanionMode;
 import net.minecraft.world.entity.ai.goal.Goal;
 import net.minecraft.world.entity.player.Player;
 
 /**
  * AI goal that makes companions mimic their owner's sneaking state.
- * Runs continuously while the companion has an owner.
+ * Only active when the companion is in FOLLOW mode.
  */
 public class CompanionMimicOwnerGoal extends Goal {
 
@@ -20,11 +21,19 @@ public class CompanionMimicOwnerGoal extends Goal {
 
     @Override
     public boolean canUse() {
+        // Only mimic when in FOLLOW mode
+        if (companion.getMode() != CompanionMode.FOLLOW) {
+            return false;
+        }
         return companion.hasOwner();
     }
 
     @Override
     public boolean canContinueToUse() {
+        // Stop mimicking if mode changed
+        if (companion.getMode() != CompanionMode.FOLLOW) {
+            return false;
+        }
         return companion.hasOwner();
     }
 

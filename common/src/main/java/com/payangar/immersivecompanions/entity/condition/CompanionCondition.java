@@ -1,18 +1,16 @@
 package com.payangar.immersivecompanions.entity.condition;
 
 import com.payangar.immersivecompanions.entity.CompanionEntity;
-import com.payangar.immersivecompanions.entity.combat.TargetGoalEntry;
-import com.payangar.immersivecompanions.entity.mode.GoalEntry;
 
-import java.util.List;
 import java.util.Set;
 
 /**
  * Interface for conditions that affect companion behavior.
  *
  * <p>Conditions represent states the entity is in (injured, poisoned, etc.)
- * that affect what actions are possible. Actions check conditions in their
- * {@code canUse()} methods, ensuring blocked actions never start.
+ * that affect what actions are possible. Goals check conditions in their
+ * {@code canUse()} methods via the entity's convenience methods (e.g., shouldFlee(),
+ * isCombatDisabled()), ensuring blocked actions never start.
  *
  * <p>This is the correct abstraction: conditions control what's possible,
  * and poses are just the consequence of whatever action is active.
@@ -46,31 +44,9 @@ public interface CompanionCondition {
         return Set.of();
     }
 
-    // ========== Goal Modification ==========
-
-    /**
-     * Gets behavior goals to add while this condition is active.
-     * For example, adding a flee goal when injured.
-     *
-     * @return List of goal entries to add (empty by default)
-     */
-    default List<GoalEntry> getBehaviorGoals() {
-        return List.of();
-    }
-
-    /**
-     * Gets target goals to add while this condition is active.
-     * Rarely needed, but possible for special conditions.
-     *
-     * @return List of target goal entries to add (empty by default)
-     */
-    default List<TargetGoalEntry> getTargetGoals() {
-        return List.of();
-    }
-
     /**
      * Checks if this condition disables combat targeting entirely.
-     * If true, target goals from the current stance won't run.
+     * If true, combat-related goals will return false from canUse().
      *
      * @return true if combat is disabled
      */
@@ -78,7 +54,7 @@ public interface CompanionCondition {
         return false;
     }
 
-    // ========== Effects ==========
+    // ========== Lifecycle Hooks ==========
 
     /**
      * Called when the condition is applied to an entity.

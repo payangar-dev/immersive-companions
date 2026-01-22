@@ -3,8 +3,8 @@ package com.payangar.immersivecompanions.network;
 import com.payangar.immersivecompanions.ImmersiveCompanions;
 import com.payangar.immersivecompanions.client.gui.CompanionRecruitmentScreen;
 import com.payangar.immersivecompanions.entity.CompanionEntity;
-import com.payangar.immersivecompanions.entity.combat.CombatStances;
-import com.payangar.immersivecompanions.entity.mode.CompanionModes;
+import com.payangar.immersivecompanions.entity.combat.CombatStance;
+import com.payangar.immersivecompanions.entity.mode.CompanionMode;
 import com.payangar.immersivecompanions.recruitment.CompanionPricing;
 import net.minecraft.client.Minecraft;
 import net.minecraft.server.level.ServerLevel;
@@ -112,8 +112,8 @@ public class NeoForgeNetworking implements ModNetworking {
                     // Transfer ownership
                     companion.setOwnerUUID(player.getUUID());
                     companion.setCompanionTeam("player_" + player.getUUID().toString());
-                    companion.setMode(CompanionModes.FOLLOW);
-                    companion.setCombatStance(CombatStances.ASSIST);
+                    companion.setMode(CompanionMode.FOLLOW);
+                    companion.setCombatStance(CombatStance.ASSIST);
                     companion.clearInteractingPlayer();
 
                     // Send recruitment message to the player

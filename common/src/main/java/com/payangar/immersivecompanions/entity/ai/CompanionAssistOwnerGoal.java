@@ -12,6 +12,7 @@ import javax.annotation.Nullable;
 /**
  * AI goal that makes companions assist their owner by targeting whatever the owner attacks.
  * Uses the owner's lastHurtMob to determine targets.
+ * Only active in ASSIST or AGGRESSIVE stances.
  */
 public class CompanionAssistOwnerGoal extends TargetGoal {
 
@@ -37,6 +38,11 @@ public class CompanionAssistOwnerGoal extends TargetGoal {
 
     @Override
     public boolean canUse() {
+        // Only assist owner when in ASSIST or AGGRESSIVE stance
+        if (!companion.canAssistOwner()) {
+            return false;
+        }
+
         // Only owned companions can assist owner
         if (!companion.hasOwner()) {
             return false;
@@ -46,11 +52,6 @@ public class CompanionAssistOwnerGoal extends TargetGoal {
             return false;
         }
         checkTimer = CHECK_INTERVAL;
-
-        // Don't assist when combat is disabled by conditions
-        if (companion.isCombatDisabled()) {
-            return false;
-        }
 
         ownerTarget = findOwnerTarget();
         return ownerTarget != null;
@@ -64,13 +65,13 @@ public class CompanionAssistOwnerGoal extends TargetGoal {
 
     @Override
     public boolean canContinueToUse() {
-        LivingEntity target = companion.getTarget();
-        if (target == null || !target.isAlive()) {
+        // Stop assisting if stance changed
+        if (!companion.canAssistOwner()) {
             return false;
         }
 
-        // Don't continue if combat is disabled by conditions
-        if (companion.isCombatDisabled()) {
+        LivingEntity target = companion.getTarget();
+        if (target == null || !target.isAlive()) {
             return false;
         }
 

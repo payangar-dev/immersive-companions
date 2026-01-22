@@ -16,6 +16,7 @@ import java.util.List;
  * - Assist: Help same-team companions that are attacking something
  *
  * Defend takes precedence over assist.
+ * Only active in ASSIST or AGGRESSIVE stances.
  */
 public class CompanionTeamCoordinationGoal extends TargetGoal {
 
@@ -38,6 +39,11 @@ public class CompanionTeamCoordinationGoal extends TargetGoal {
 
     @Override
     public boolean canUse() {
+        // Only coordinate in ASSIST or AGGRESSIVE stances
+        if (!companion.canAssistTeammates()) {
+            return false;
+        }
+
         if (!ModConfig.get().isEnableTeamCoordination()) {
             return false;
         }
@@ -46,11 +52,6 @@ public class CompanionTeamCoordinationGoal extends TargetGoal {
             return false;
         }
         checkTimer = CHECK_INTERVAL;
-
-        // Don't coordinate when combat is disabled by conditions
-        if (companion.isCombatDisabled()) {
-            return false;
-        }
 
         // Try defend first (higher priority)
         coordinationTarget = findDefendTarget();
@@ -71,13 +72,13 @@ public class CompanionTeamCoordinationGoal extends TargetGoal {
 
     @Override
     public boolean canContinueToUse() {
-        LivingEntity target = companion.getTarget();
-        if (target == null || !target.isAlive()) {
+        // Stop coordinating if stance changed
+        if (!companion.canAssistTeammates()) {
             return false;
         }
 
-        // Don't continue if combat is disabled by conditions
-        if (companion.isCombatDisabled()) {
+        LivingEntity target = companion.getTarget();
+        if (target == null || !target.isAlive()) {
             return false;
         }
 

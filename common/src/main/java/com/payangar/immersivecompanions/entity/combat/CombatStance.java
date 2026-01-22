@@ -1,24 +1,29 @@
 package com.payangar.immersivecompanions.entity.combat;
 
-import com.payangar.immersivecompanions.entity.CompanionEntity;
-import com.payangar.immersivecompanions.entity.mode.GoalEntry;
 import net.minecraft.network.chat.Component;
 
-import java.util.List;
+import javax.annotation.Nullable;
 
 /**
- * Sealed interface representing a combat stance that controls companion targeting behavior.
- * Each stance defines which targets the companion will engage and any custom behaviors.
+ * Enum representing combat stances that control companion targeting behavior.
+ * Each stance defines which targets the companion will engage.
  *
- * <p>Combat stances are independent of movement modes (follow/wander) and control:
- * <ul>
- *   <li>Target selection (who to attack)</li>
- *   <li>Custom behaviors (like fleeing for passive stance)</li>
- * </ul>
+ * <p>Goals check the companion's current stance to determine if they should run.
  *
- * <p>Stances follow the Strategy pattern with singleton instances.
+ * <p>Stance progression from least to most aggressive:
+ * PASSIVE → DEFENSIVE → ASSIST → AGGRESSIVE
  */
-public sealed interface CombatStance permits PassiveStance, DefensiveStance, AssistStance, AggressiveStance {
+public enum CombatStance {
+    PASSIVE("passive"),
+    DEFENSIVE("defensive"),
+    ASSIST("assist"),
+    AGGRESSIVE("aggressive");
+
+    private final String id;
+
+    CombatStance(String id) {
+        this.id = id;
+    }
 
     /**
      * Gets the unique identifier for this stance.
@@ -26,50 +31,17 @@ public sealed interface CombatStance permits PassiveStance, DefensiveStance, Ass
      *
      * @return The stance ID (e.g., "passive", "aggressive")
      */
-    String getId();
-
-    /**
-     * Gets the target goals that determine who/when to attack.
-     * These are added to the targetSelector when this stance is active.
-     *
-     * @return List of target goal entries with priorities
-     */
-    List<TargetGoalEntry> getTargetGoals();
-
-    /**
-     * Gets additional behavior goals specific to this stance.
-     * For example, passive stance adds a flee behavior.
-     * These are added to the goalSelector when this stance is active.
-     *
-     * @return List of behavior goal entries with priorities
-     */
-    default List<GoalEntry> getBehaviorGoals() {
-        return List.of();
+    public String getId() {
+        return id;
     }
-
-    /**
-     * Called when entering this stance.
-     * Override to perform initialization like clearing targets.
-     *
-     * @param companion The companion entering this stance
-     */
-    default void onEnter(CompanionEntity companion) {}
-
-    /**
-     * Called when leaving this stance.
-     * Override to perform cleanup.
-     *
-     * @param companion The companion leaving this stance
-     */
-    default void onExit(CompanionEntity companion) {}
 
     /**
      * Gets the display name for this stance, suitable for UI.
      *
      * @return The translatable component for the stance name
      */
-    default Component getDisplayName() {
-        return Component.translatable("stance.immersivecompanions." + getId());
+    public Component getDisplayName() {
+        return Component.translatable("stance.immersivecompanions." + id);
     }
 
     /**
@@ -77,8 +49,19 @@ public sealed interface CombatStance permits PassiveStance, DefensiveStance, Ass
      *
      * @return The translatable component for the stance description
      */
-    default Component getDescription() {
-        return Component.translatable("stance.immersivecompanions." + getId() + ".desc");
+    public Component getDescription() {
+        return Component.translatable("stance.immersivecompanions." + id + ".desc");
+    }
+
+    /**
+     * Gets the next stance in the cycle.
+     * Order: PASSIVE → DEFENSIVE → ASSIST → AGGRESSIVE → PASSIVE
+     *
+     * @return The next stance in the cycle
+     */
+    public CombatStance next() {
+        CombatStance[] stances = values();
+        return stances[(this.ordinal() + 1) % stances.length];
     }
 
     /**
@@ -87,7 +70,13 @@ public sealed interface CombatStance permits PassiveStance, DefensiveStance, Ass
      * @param id The stance ID
      * @return The stance, or AGGRESSIVE if not found
      */
-    static CombatStance byId(String id) {
-        return CombatStances.byId(id);
+    @Nullable
+    public static CombatStance byId(String id) {
+        for (CombatStance stance : values()) {
+            if (stance.id.equals(id)) {
+                return stance;
+            }
+        }
+        return AGGRESSIVE;
     }
 }

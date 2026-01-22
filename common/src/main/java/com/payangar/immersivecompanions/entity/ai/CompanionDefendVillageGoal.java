@@ -16,6 +16,7 @@ import java.util.List;
 /**
  * AI goal that makes companions defend villages by targeting players
  * who have attacked villagers (tracked through the gossip system).
+ * Only active in AGGRESSIVE stance and for companions in a villager team.
  */
 public class CompanionDefendVillageGoal extends TargetGoal {
 
@@ -40,6 +41,11 @@ public class CompanionDefendVillageGoal extends TargetGoal {
 
     @Override
     public boolean canUse() {
+        // Only defend village when in AGGRESSIVE stance and in villager team
+        if (!companion.canDefendVillage()) {
+            return false;
+        }
+
         if (--checkTimer > 0) {
             return false;
         }
@@ -61,6 +67,11 @@ public class CompanionDefendVillageGoal extends TargetGoal {
 
     @Override
     public boolean canContinueToUse() {
+        // Stop defending if stance changed
+        if (!companion.canDefendVillage()) {
+            return false;
+        }
+
         LivingEntity target = companion.getTarget();
         if (target instanceof Player player) {
             return player.isAlive() && companion.distanceToSqr(player) < SEARCH_RANGE * SEARCH_RANGE;

@@ -1,18 +1,24 @@
 package com.payangar.immersivecompanions.entity.mode;
 
-import com.payangar.immersivecompanions.entity.CompanionEntity;
 import net.minecraft.network.chat.Component;
 
-import java.util.List;
+import javax.annotation.Nullable;
 
 /**
- * Sealed interface defining the contract for companion behavioral modes.
- * Each mode encapsulates its own behavior through declarative goal registration.
+ * Enum defining the behavioral modes for companions.
+ * Each mode controls which movement-related goals are active via canUse() checks.
  *
- * <p>Design Pattern: State Pattern with singleton mode classes.
- * Each mode is stateless and can be safely shared across all companion instances.</p>
+ * <p>Goals check the companion's current mode to determine if they should run.
  */
-public sealed interface CompanionMode permits WanderMode, FollowMode {
+public enum CompanionMode {
+    WANDER("wander"),
+    FOLLOW("follow");
+
+    private final String id;
+
+    CompanionMode(String id) {
+        this.id = id;
+    }
 
     /**
      * Gets the unique identifier for this mode.
@@ -20,50 +26,8 @@ public sealed interface CompanionMode permits WanderMode, FollowMode {
      *
      * @return The mode's unique string ID
      */
-    String getId();
-
-    /**
-     * Gets the list of goals this mode provides.
-     * Goals will be added to the companion's goal selector when entering this mode.
-     *
-     * @return List of goal entries with priorities and factories
-     */
-    List<GoalEntry> getGoals();
-
-    /**
-     * Called when a companion enters this mode.
-     * Override to perform mode-specific initialization.
-     *
-     * @param companion The companion entering this mode
-     */
-    default void onEnter(CompanionEntity companion) {}
-
-    /**
-     * Called when a companion exits this mode.
-     * Override to perform mode-specific cleanup.
-     *
-     * @param companion The companion exiting this mode
-     */
-    default void onExit(CompanionEntity companion) {}
-
-    /**
-     * Called every tick while the companion is in this mode.
-     * Override for mode-specific per-tick behavior.
-     *
-     * @param companion The companion in this mode
-     */
-    default void tick(CompanionEntity companion) {}
-
-    /**
-     * Checks if a transition to the target mode is allowed.
-     * Override to implement mode-specific transition rules.
-     *
-     * @param target    The mode being transitioned to
-     * @param companion The companion attempting the transition
-     * @return true if the transition is allowed
-     */
-    default boolean canTransitionTo(CompanionMode target, CompanionEntity companion) {
-        return true;
+    public String getId() {
+        return id;
     }
 
     /**
@@ -71,8 +35,8 @@ public sealed interface CompanionMode permits WanderMode, FollowMode {
      *
      * @return The translatable display name component
      */
-    default Component getDisplayName() {
-        return Component.translatable("mode.immersivecompanions." + getId());
+    public Component getDisplayName() {
+        return Component.translatable("mode.immersivecompanions." + id);
     }
 
     /**
@@ -81,7 +45,24 @@ public sealed interface CompanionMode permits WanderMode, FollowMode {
      * @param id The mode ID to look up
      * @return The corresponding mode, or WANDER as fallback
      */
-    static CompanionMode byId(String id) {
-        return CompanionModes.byId(id);
+    @Nullable
+    public static CompanionMode byId(String id) {
+        for (CompanionMode mode : values()) {
+            if (mode.id.equals(id)) {
+                return mode;
+            }
+        }
+        return WANDER;
+    }
+
+    /**
+     * Gets the next mode in the cycle.
+     * Order: WANDER → FOLLOW → WANDER
+     *
+     * @return The next mode
+     */
+    public CompanionMode next() {
+        CompanionMode[] modes = values();
+        return modes[(this.ordinal() + 1) % modes.length];
     }
 }

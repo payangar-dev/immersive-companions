@@ -1,108 +1,159 @@
-# Companion Condition System
+# Immersive Companions - AI Agent Guide
 
-## Overview
+## Project Overview
 
-Conditions are states that affect what a companion can do (injured, poisoned, etc.). Actions check conditions **before** starting, so blocked actions never begin - this prevents pose conflicts.
+Minecraft mod that adds recruitable companion NPCs to villages. Companions have different genders, combat types (melee/ranged), skins, and can be hired by players using emeralds. They follow owners, fight alongside them, and defend villages.
 
-## Adding a New Condition
+- **Minecraft**: 1.21.1 | **Java**: 21 | **Loaders**: Fabric, NeoForge (multiloader)
 
-1. Create a class implementing `CompanionCondition` in `entity/condition/`:
+## Build & Run Commands
 
+```bash
+./gradlew build              # Build all loaders
+./gradlew runFabric          # Run Fabric client
+./gradlew runNeoForge        # Run NeoForge client
+```
+
+## Project Structure
+
+```
+immersive-companions/
+├── common/src/main/java/.../    # Shared code (most logic lives here)
+│   ├── entity/                  # CompanionEntity + AI + combat/conditions/modes
+│   │   ├── ai/                  # Goal classes (movement, combat, targeting)
+│   │   ├── combat/              # CombatStance enum
+│   │   ├── condition/           # Condition system (CriticalInjury, etc.)
+│   │   └── mode/                # CompanionMode enum (WANDER/FOLLOW)
+│   ├── config/                  # ModConfig (JSON-based)
+│   ├── data/                    # Skins, names, equipment definitions
+│   ├── network/                 # Platform-agnostic packet interfaces
+│   ├── platform/                # Services interface for platform abstraction
+│   ├── recruitment/             # Pricing logic
+│   ├── registry/                # ModEntityTypes holder
+│   ├── spawning/                # Village spawn logic
+│   └── client/                  # GUI screens, renderers
+├── fabric/src/main/java/.../    # Fabric-specific implementation
+│   ├── platform/                # FabricServices
+│   ├── network/                 # FabricNetworking
+│   ├── registry/                # Entity registration
+│   └── mixin/                   # VillageStructureMixin for spawning
+├── neoforge/src/main/java/.../  # NeoForge-specific implementation
+│   ├── platform/                # NeoForgeServices
+│   ├── network/                 # NeoForgeNetworking
+│   ├── events/                  # Spawn events
+│   └── compat/epicfight/        # Epic Fight mod compatibility
+└── gradle.properties            # Version config
+```
+
+## Core Systems
+
+### CompanionEntity (`entity/CompanionEntity.java`)
+Central mob class extending `PathfinderMob`. Key aspects:
+- **Synced Data**: Gender, combat type, skin, mode, stance, team via `EntityDataAccessor`
+- **NBT Persistence**: `addAdditionalSaveData()` / `readAdditionalSaveData()`
+- **Goal Registration**: `registerGoals()` - all goals added once, filter via `canUse()`
+- **Conditions**: `addCondition()`, `removeCondition()`, `hasCondition()`, `canPerformAction()`
+- **Combat**: `performRangedAttack()`, implements `RangedAttackMob`
+
+### Goal System (`entity/ai/`)
+Priority-based Minecraft AI. **All goals registered statically at entity creation**; they decide when to run via `canUse()` / `canContinueToUse()` checks.
+
+| Priority | Goal | Activation |
+|----------|------|------------|
+| 0 | InteractionGoal | During recruitment screen |
+| 1 | FloatGoal, FleeGoal, MeleeAttackGoal, RangedAttackGoal | Conditions/combat type |
+| 4 | MimicOwnerGoal | FOLLOW mode |
+| 6 | FollowOwnerGoal, WanderGoal | Mode-based |
+
+Target goals check stance: `canRetaliate()`, `canAssistOwner()`, `canProactivelyAttack()`, etc.
+
+### Condition System (`entity/condition/`)
+States affecting capabilities. Goals check via entity methods before starting.
+
+- `CompanionCondition` - interface with `getBlockedActions()`, `disablesCombat()`, lifecycle hooks
+- `CompanionConditions` - registry of all conditions
+- `CriticalInjuryCondition` - example: blocks swimming/jumping, disables combat, forces crouch
+- `ActionType` - enum of blockable actions (SWIM, SLEEP, JUMP, SPRINT)
+
+### Mode System (`entity/mode/CompanionMode.java`)
+Movement behavior enum:
+- `WANDER` - random stroll, stays near village
+- `FOLLOW` - follows owner, teleports if too far
+
+### Combat Stance (`entity/combat/CombatStance.java`)
+Targeting behavior enum:
+- `PASSIVE` - no combat
+- `DEFENSIVE` - retaliate only
+- `ASSIST` - help owner's targets
+- `AGGRESSIVE` - attack hostile mobs proactively
+
+### Config (`config/ModConfig.java`)
+JSON file at `config/immersivecompanions.json`. Static fields for YACL GUI binding.
+Key options: `enableCriticalInjury`, `criticalInjuryThreshold`, `enableTeamCoordination`, etc.
+
+### Spawning (`spawning/CompanionSpawnLogic.java`)
+Village generation hook. Scales spawn chance with villager count (3+ villagers required).
+- Fabric: `VillageStructureMixin`
+- NeoForge: `NeoForgeSpawnEvents`
+
+### Networking (`network/`)
+Platform abstraction via `ModNetworking` interface. Payloads: `OpenRecruitmentScreen`, `CloseRecruitmentScreen`, `PurchaseCompanion`.
+
+## Key Patterns
+
+### Static Goal Registration
+Goals are added once in `registerGoals()`. Each goal checks conditions in `canUse()`:
 ```java
-public class StunnedCondition implements CompanionCondition {
-    public static final StunnedCondition INSTANCE = new StunnedCondition();
-
-    @Override
-    public String getId() { return "stunned"; }
-
-    @Override
-    public boolean isEnabled() { return ModConfig.get().isEnableStunned(); }
-
-    // Block actions
-    @Override
-    public Set<ActionType> getBlockedActions() {
-        return Set.of(ActionType.JUMP, ActionType.SPRINT);
-    }
-
-    // Disable combat targeting
-    @Override
-    public boolean disablesCombat() { return true; }
-
-    // Add goals while active
-    @Override
-    public List<GoalEntry> getBehaviorGoals() {
-        return List.of(new GoalEntry(1, SomeGoal::new));
-    }
-
-    // Force crouching pose
-    @Override
-    public boolean forcesCrouching() { return false; }
-
-    // Lifecycle
-    @Override
-    public void onApply(CompanionEntity entity) {
-        // Apply attribute modifiers, register goals
-        entity.registerConditionGoals(this);
-    }
-
-    @Override
-    public void onRemove(CompanionEntity entity) {
-        // Remove modifiers, unregister goals
-        entity.removeConditionGoals(this);
-    }
+@Override
+public boolean canUse() {
+    if (companion.getMode() != CompanionMode.FOLLOW) return false;
+    // ... other checks
 }
 ```
 
-2. Register in `CompanionConditions.java`:
+### Platform Abstraction
+`Services` interface implemented per-loader. Access via `Services.get()`.
 
+### NBT + EntityDataAccessor
+- NBT for persistence (save/load)
+- EntityDataAccessor for client-server sync
+
+### Condition Checks Before Actions
 ```java
-public static final CompanionCondition STUNNED = register(StunnedCondition.INSTANCE);
+if (!companion.canPerformAction(ActionType.JUMP)) return;
+if (companion.isCombatDisabled()) return false;
 ```
 
-3. Trigger the condition somewhere in `CompanionEntity`:
+## Quick Reference
 
-```java
-entity.addCondition(StunnedCondition.INSTANCE);
-entity.removeCondition(StunnedCondition.INSTANCE);
-```
+| System | Location |
+|--------|----------|
+| Main Entity | `common/.../entity/CompanionEntity.java` |
+| All Goals | `common/.../entity/ai/` |
+| Conditions | `common/.../entity/condition/` |
+| Combat Stance | `common/.../entity/combat/CombatStance.java` |
+| Mode | `common/.../entity/mode/CompanionMode.java` |
+| Config | `common/.../config/ModConfig.java` |
+| Spawn Logic | `common/.../spawning/CompanionSpawnLogic.java` |
+| Networking | `common/.../network/ModNetworking.java` |
+| Services | `common/.../platform/Services.java` |
 
-## Adding a New Action Type
+## Adding New Features
 
-1. Add to `ActionType.java`:
+### Adding a Condition
+1. Create class implementing `CompanionCondition` in `entity/condition/`
+2. Register in `CompanionConditions.java`: `public static final CompanionCondition X = register(XCondition.INSTANCE);`
+3. Trigger via `entity.addCondition()` / `removeCondition()`
 
-```java
-public enum ActionType {
-    SWIM, SLEEP, JUMP, SPRINT,
-    CLIMB  // new
-}
-```
+See `CriticalInjuryCondition.java` for reference.
 
-2. Check it where the action happens:
+### Adding a Goal
+1. Create goal class in `entity/ai/`, check mode/stance/conditions in `canUse()`
+2. Register in `CompanionEntity.registerGoals()` with appropriate priority
+3. No dynamic add/remove needed - goal filters itself via `canUse()`
 
-```java
-if (!companion.canPerformAction(ActionType.CLIMB)) {
-    return; // or return false in canUse()
-}
-```
-
-## Key Methods in CompanionEntity
-
-| Method | Purpose |
-|--------|---------|
-| `addCondition(condition)` | Apply a condition |
-| `removeCondition(condition)` | Remove a condition |
-| `hasCondition(condition)` | Check if active |
-| `canPerformAction(ActionType)` | Check if action is allowed |
-| `isCombatDisabled()` | Check if any condition blocks combat |
-| `shouldForceCrouch()` | Check if any condition forces crouching |
-
----
-
-# ModConfig
-
-## Adding a New ModConfig Entry
-
-When adding a new config option to `ModConfig`, you must also handle the client-side config screen:
-
-1. Add the field and getter to `ModConfig.java`
-2. Update the client-side config screen to include the new option for editing
+### Adding Config Options
+1. Add static field + getter in `ModConfig.java`
+2. Add to `ConfigData` inner class
+3. Update `load()` and `save()` methods
+4. Update client config screen (per-loader)

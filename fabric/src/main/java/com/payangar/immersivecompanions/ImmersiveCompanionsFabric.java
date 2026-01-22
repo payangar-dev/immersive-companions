@@ -2,6 +2,7 @@ package com.payangar.immersivecompanions;
 
 import com.payangar.immersivecompanions.config.ModConfig;
 import com.payangar.immersivecompanions.entity.CompanionEntity;
+import com.payangar.immersivecompanions.entity.CompanionTeleportHandler;
 import com.payangar.immersivecompanions.mixin.MobAccessor;
 import com.payangar.immersivecompanions.network.FabricNetworking;
 import com.payangar.immersivecompanions.platform.FabricServices;
@@ -9,6 +10,7 @@ import com.payangar.immersivecompanions.platform.Services;
 import com.payangar.immersivecompanions.registry.FabricEntityRegistration;
 import com.payangar.immersivecompanions.spawning.CompanionSpawnLogic;
 import net.fabricmc.api.ModInitializer;
+import net.fabricmc.fabric.api.entity.event.v1.ServerEntityWorldChangeEvents;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerEntityEvents;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents;
 import net.minecraft.world.entity.ai.goal.target.NearestAttackableTargetGoal;
@@ -27,9 +29,15 @@ public class ImmersiveCompanionsFabric implements ModInitializer {
         // Register networking payloads
         FabricNetworking.registerPayloads();
 
-        // Clear tracked chunks on server stop
+        // Clear tracked chunks and teleport registry on server stop
         ServerLifecycleEvents.SERVER_STOPPED.register(server -> {
             CompanionSpawnLogic.clearTrackedChunks();
+            CompanionTeleportHandler.clear();
+        });
+
+        // Handle dimension changes - teleport companions when owner changes dimension
+        ServerEntityWorldChangeEvents.AFTER_PLAYER_CHANGE_WORLD.register((player, origin, destination) -> {
+            CompanionTeleportHandler.onPlayerTeleport(player, destination, player.position());
         });
 
         // Make monsters target companions

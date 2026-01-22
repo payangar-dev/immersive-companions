@@ -5,7 +5,20 @@ import com.payangar.immersivecompanions.data.CompanionEquipment;
 import com.payangar.immersivecompanions.data.CompanionNames;
 import com.payangar.immersivecompanions.data.CompanionSkins;
 import com.payangar.immersivecompanions.data.SkinInfo;
-import com.payangar.immersivecompanions.entity.ai.*;
+import com.payangar.immersivecompanions.entity.ai.CompanionAssistOwnerGoal;
+import com.payangar.immersivecompanions.entity.ai.CompanionDefendTeammatesGoal;
+import com.payangar.immersivecompanions.entity.ai.CompanionDefendVillageGoal;
+import com.payangar.immersivecompanions.entity.ai.CompanionFleeFromAttackerGoal;
+import com.payangar.immersivecompanions.entity.ai.CompanionFloatGoal;
+import com.payangar.immersivecompanions.entity.ai.CompanionFollowOwnerGoal;
+import com.payangar.immersivecompanions.entity.ai.CompanionHurtByTargetGoal;
+import com.payangar.immersivecompanions.entity.ai.CompanionInteractionGoal;
+import com.payangar.immersivecompanions.entity.ai.CompanionMeleeAttackGoal;
+import com.payangar.immersivecompanions.entity.ai.CompanionMimicOwnerGoal;
+import com.payangar.immersivecompanions.entity.ai.CompanionNearestAttackableTargetGoal;
+import com.payangar.immersivecompanions.entity.ai.CompanionRangedAttackGoal;
+import com.payangar.immersivecompanions.entity.ai.CompanionTeamCoordinationGoal;
+import com.payangar.immersivecompanions.entity.ai.CompanionWaterAvoidingRandomStrollGoal;
 import com.payangar.immersivecompanions.entity.combat.CombatStance;
 import com.payangar.immersivecompanions.entity.condition.ActionType;
 import com.payangar.immersivecompanions.entity.condition.CompanionCondition;
@@ -372,8 +385,18 @@ public class CompanionEntity extends PathfinderMob implements RangedAttackMob {
             return;
         }
 
+        Boolean needUnregister = this.currentMode == CompanionMode.FOLLOW;
         this.currentMode = mode;
         this.entityData.set(DATA_MODE_ID, mode.getId());
+
+        // Handle teleport handler registration
+        if (!this.level().isClientSide) {
+            if (mode == CompanionMode.FOLLOW && hasOwner()) {
+                CompanionTeleportHandler.register(this);
+            } else if (needUnregister) {
+                CompanionTeleportHandler.unregister(this);
+            }
+        }
     }
 
     // ========== Combat Stance System ==========
@@ -595,11 +618,24 @@ public class CompanionEntity extends PathfinderMob implements RangedAttackMob {
 
     /**
      * Sets the owner of this companion.
+     * Handles all ownership transitions: null→owner, owner→null, and owner A→owner B.
      *
      * @param uuid The owner's UUID, or null to clear ownership
      */
     public void setOwnerUUID(@Nullable UUID uuid) {
+        UUID oldOwner = this.ownerUUID;
         this.ownerUUID = uuid;
+
+        if (!this.level().isClientSide && isInFollowMode()) {
+            // Unregister from old owner first (if any)
+            if (oldOwner != null) {
+                CompanionTeleportHandler.unregister(this.getUUID(), oldOwner);
+            }
+            // Register to new owner (if any)
+            if (uuid != null) {
+                CompanionTeleportHandler.register(this);
+            }
+        }
     }
 
     /**
@@ -769,6 +805,11 @@ public class CompanionEntity extends PathfinderMob implements RangedAttackMob {
             this.currentStance = stance;
             this.entityData.set(DATA_COMBAT_STANCE, stance.getId());
         }
+
+        // Register with teleport handler if in FOLLOW mode with an owner
+        if (!this.level().isClientSide && hasOwner() && isInFollowMode()) {
+            CompanionTeleportHandler.register(this);
+        }
     }
 
     /**
@@ -900,6 +941,11 @@ public class CompanionEntity extends PathfinderMob implements RangedAttackMob {
             for (CompanionCondition condition : activeConditions) {
                 condition.tick(this);
             }
+
+            // Update position tracking for teleport handler
+            if (isInFollowMode() && hasOwner()) {
+                CompanionTeleportHandler.updatePosition(this);
+            }
         }
     }
 
@@ -910,6 +956,16 @@ public class CompanionEntity extends PathfinderMob implements RangedAttackMob {
             return;
         }
         super.jumpFromGround();
+    }
+
+    @Override
+    public void remove(RemovalReason reason) {
+        // Unregister from teleport handler before removal
+        // Use explicit IDs in case entity state is modified during removal
+        if (!this.level().isClientSide && this.ownerUUID != null) {
+            CompanionTeleportHandler.unregister(this.getUUID(), this.ownerUUID);
+        }
+        super.remove(reason);
     }
 
     // Check if this entity can use ranged weapons

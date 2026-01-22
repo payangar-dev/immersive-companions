@@ -10,6 +10,7 @@ import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.state.BlockState;
 
+import javax.annotation.Nullable;
 import java.util.EnumSet;
 
 /**
@@ -19,9 +20,9 @@ import java.util.EnumSet;
  */
 public class CompanionFollowOwnerGoal extends Goal {
 
-    private static final double STOP_DISTANCE = 2.0;
+    private static final double STOP_DISTANCE = 3.0;
     private static final double START_DISTANCE = 5.0;
-    private static final double TELEPORT_DISTANCE = 12.0;
+    private static final double TELEPORT_DISTANCE = 32.0;
     private static final int PATH_RECALC_DELAY = 10;
 
     private final CompanionEntity companion;
@@ -117,19 +118,48 @@ public class CompanionFollowOwnerGoal extends Goal {
     private void teleportToOwner() {
         BlockPos ownerPos = owner.blockPosition();
 
-        // Try to find a safe teleport position nearby
-        for (int attempt = 0; attempt < 10; attempt++) {
-            int dx = randomOffset(3);
-            int dz = randomOffset(3);
-            BlockPos testPos = ownerPos.offset(dx, 0, dz);
+        // Try to find a safe teleport position nearby with larger search radius
+        for (int attempt = 0; attempt < 20; attempt++) {
+            int dx = randomOffset(5);
+            int dy = randomOffset(2); // Vertical variance for terrain handling
+            int dz = randomOffset(5);
+            BlockPos testPos = ownerPos.offset(dx, dy, dz);
 
-            if (canTeleportTo(testPos)) {
-                companion.moveTo(testPos.getX() + 0.5, testPos.getY(), testPos.getZ() + 0.5,
+            // Search vertically to find ground level
+            BlockPos validPos = findValidTeleportPosition(testPos);
+            if (validPos != null) {
+                companion.moveTo(validPos.getX() + 0.5, validPos.getY(), validPos.getZ() + 0.5,
                         companion.getYRot(), companion.getXRot());
                 navigation.stop();
                 return;
             }
         }
+    }
+
+    /**
+     * Searches vertically from the given position to find a valid teleport spot.
+     * Checks 4 blocks up and down from the initial position.
+     */
+    @Nullable
+    private BlockPos findValidTeleportPosition(BlockPos pos) {
+        // Check at the given position first
+        if (canTeleportTo(pos)) {
+            return pos;
+        }
+
+        // Search up and down from the initial position
+        for (int yOffset = 1; yOffset <= 4; yOffset++) {
+            BlockPos above = pos.above(yOffset);
+            if (canTeleportTo(above)) {
+                return above;
+            }
+            BlockPos below = pos.below(yOffset);
+            if (canTeleportTo(below)) {
+                return below;
+            }
+        }
+
+        return null;
     }
 
     private int randomOffset(int range) {

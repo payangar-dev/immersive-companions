@@ -3,11 +3,13 @@ package com.payangar.immersivecompanions.events;
 import com.payangar.immersivecompanions.ImmersiveCompanions;
 import com.payangar.immersivecompanions.config.ModConfig;
 import com.payangar.immersivecompanions.entity.CompanionEntity;
+import com.payangar.immersivecompanions.entity.CompanionTeleportHandler;
 import com.payangar.immersivecompanions.spawning.CompanionSpawnLogic;
 import it.unimi.dsi.fastutil.longs.LongSet;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.ai.goal.target.NearestAttackableTargetGoal;
 import net.minecraft.world.entity.monster.Creeper;
 import net.minecraft.world.entity.monster.EnderMan;
@@ -16,9 +18,11 @@ import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.chunk.LevelChunk;
 import net.minecraft.world.level.levelgen.structure.Structure;
 import net.minecraft.world.level.levelgen.structure.StructureStart;
+import net.minecraft.world.phys.Vec3;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.event.entity.EntityJoinLevelEvent;
+import net.neoforged.neoforge.event.entity.EntityTeleportEvent;
 import net.neoforged.neoforge.event.level.ChunkEvent;
 import net.neoforged.neoforge.event.server.ServerStoppedEvent;
 
@@ -100,6 +104,21 @@ public class NeoForgeSpawnEvents {
     @SubscribeEvent
     public static void onServerStopped(ServerStoppedEvent event) {
         CompanionSpawnLogic.clearTrackedChunks();
+        CompanionTeleportHandler.clear();
+    }
+
+    /**
+     * Handles player teleportation events to teleport companions along with their owner.
+     * Catches /tp, waystones, ender pearls, etc.
+     */
+    @SubscribeEvent
+    public static void onEntityTeleport(EntityTeleportEvent event) {
+        if (!(event.getEntity() instanceof ServerPlayer player)) return;
+
+        ServerLevel targetLevel = (ServerLevel) player.level(); // Same level for intra-world teleports
+        Vec3 targetPos = new Vec3(event.getTargetX(), event.getTargetY(), event.getTargetZ());
+
+        CompanionTeleportHandler.onPlayerTeleport(player, targetLevel, targetPos);
     }
 
     /**

@@ -29,6 +29,8 @@ import net.minecraft.sounds.SoundEvents;
 import net.minecraft.world.DifficultyInstance;
 import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.entity.*;
+import net.minecraft.world.entity.ai.attributes.AttributeInstance;
+import net.minecraft.world.entity.ai.attributes.AttributeModifier;
 import net.minecraft.world.entity.ai.attributes.AttributeSupplier;
 import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.entity.ai.goal.*;
@@ -84,14 +86,27 @@ public class CompanionEntity extends PathfinderMob implements RangedAttackMob {
     /** Default team for village-spawned companions */
     public static final String DEFAULT_TEAM = "village_guard";
 
-    /** Callback for post-ranged-attack events (used by Epic Fight compat for shooting animation) */
+    /** Attribute modifier ID for sneak speed reduction */
+    private static final ResourceLocation SNEAK_SPEED_MODIFIER_ID = ResourceLocation.fromNamespaceAndPath(
+            "immersivecompanions", "sneak_speed");
+
+    /**
+     * Callback for post-ranged-attack events (used by Epic Fight compat for
+     * shooting animation)
+     */
     private Runnable onRangedAttackCallback = null;
 
-    /** UUID of the player currently interacting with this companion (recruitment screen open) */
+    /**
+     * UUID of the player currently interacting with this companion (recruitment
+     * screen open)
+     */
     @Nullable
     private UUID interactingPlayerUUID = null;
 
-    /** Timeout counter to auto-clear interaction if player disconnects or screen closes without packet */
+    /**
+     * Timeout counter to auto-clear interaction if player disconnects or screen
+     * closes without packet
+     */
     private int interactionTimeout = 0;
 
     /** Maximum ticks before interaction auto-clears (30 seconds = 600 ticks) */
@@ -110,10 +125,16 @@ public class CompanionEntity extends PathfinderMob implements RangedAttackMob {
     /** Current combat stance controlling targeting behavior */
     private CombatStance currentStance = CombatStances.AGGRESSIVE;
 
-    /** List of target goals added by the current stance (for removal on stance change) */
+    /**
+     * List of target goals added by the current stance (for removal on stance
+     * change)
+     */
     private final List<Goal> activeStanceTargetGoals = new ArrayList<>();
 
-    /** List of behavior goals added by the current stance (for removal on stance change) */
+    /**
+     * List of behavior goals added by the current stance (for removal on stance
+     * change)
+     */
     private final List<Goal> activeStanceBehaviorGoals = new ArrayList<>();
 
     // ========== Condition System ==========
@@ -121,7 +142,9 @@ public class CompanionEntity extends PathfinderMob implements RangedAttackMob {
     /** Set of currently active conditions affecting this companion */
     private final Set<CompanionCondition> activeConditions = new HashSet<>();
 
-    /** Map of conditions to their registered goals (for removal when condition ends) */
+    /**
+     * Map of conditions to their registered goals (for removal when condition ends)
+     */
     private final Map<CompanionCondition, List<Goal>> conditionGoals = new HashMap<>();
 
     public CompanionEntity(EntityType<? extends CompanionEntity> entityType, Level level) {
@@ -159,7 +182,8 @@ public class CompanionEntity extends PathfinderMob implements RangedAttackMob {
 
     @Override
     protected void registerGoals() {
-        // Priority 0: Interaction - stops movement and looks at player during recruitment screen
+        // Priority 0: Interaction - stops movement and looks at player during
+        // recruitment screen
         this.goalSelector.addGoal(0, new CompanionInteractionGoal(this));
 
         // Priority 1: Swimming (uses CompanionFloatGoal which respects conditions)
@@ -203,6 +227,7 @@ public class CompanionEntity extends PathfinderMob implements RangedAttackMob {
                     }
                     return super.canUse();
                 }
+
                 @Override
                 public boolean canContinueToUse() {
                     if (CompanionEntity.this.isCombatDisabled()) {
@@ -210,11 +235,13 @@ public class CompanionEntity extends PathfinderMob implements RangedAttackMob {
                     }
                     return super.canContinueToUse();
                 }
+
                 @Override
                 public void start() {
                     super.start();
                     CompanionEntity.this.setAggressive(true);
                 }
+
                 @Override
                 public void stop() {
                     super.stop();
@@ -227,7 +254,7 @@ public class CompanionEntity extends PathfinderMob implements RangedAttackMob {
     @Nullable
     @Override
     public SpawnGroupData finalizeSpawn(ServerLevelAccessor level, DifficultyInstance difficulty,
-                                         MobSpawnType spawnType, @Nullable SpawnGroupData spawnData) {
+            MobSpawnType spawnType, @Nullable SpawnGroupData spawnData) {
         spawnData = super.finalizeSpawn(level, difficulty, spawnType, spawnData);
 
         // Randomize appearance
@@ -589,27 +616,25 @@ public class CompanionEntity extends PathfinderMob implements RangedAttackMob {
                 .anyMatch(CompanionCondition::disablesCombat);
     }
 
-    /**
-     * Checks if the companion should be forced to crouch by any condition.
-     *
-     * @return true if crouching should be forced
-     */
-    public boolean shouldForceCrouch() {
-        return activeConditions.stream()
-                .anyMatch(CompanionCondition::forcesCrouching);
-    }
-
     // ========== Sneaking State Management ==========
 
     /**
      * Starts sneaking for this companion.
      * Sets both the shift key state and the crouching pose.
-     * Use this method instead of manually setting shift key and pose to ensure consistency.
+     * Use this method instead of manually setting shift key and pose to ensure
+     * consistency.
      */
     public void startSneaking() {
+        if (this.getPose() == Pose.DYING || this.getPose() == Pose.SLEEPING)
+            return;
         this.setShiftKeyDown(true);
-        if (this.getPose() != Pose.DYING && this.getPose() != Pose.SLEEPING) {
-            this.setPose(Pose.CROUCHING);
+        this.setPose(Pose.CROUCHING);
+
+        AttributeInstance speed = this.getAttribute(Attributes.MOVEMENT_SPEED);
+        if (speed != null && !speed.hasModifier(SNEAK_SPEED_MODIFIER_ID)) {
+            AttributeModifier modifier = new AttributeModifier(
+                    SNEAK_SPEED_MODIFIER_ID, -0.3, AttributeModifier.Operation.ADD_MULTIPLIED_TOTAL);
+            speed.addTransientModifier(modifier);
         }
     }
 
@@ -617,12 +642,17 @@ public class CompanionEntity extends PathfinderMob implements RangedAttackMob {
      * Stops sneaking for this companion.
      * Clears the shift key state and restores the standing pose.
      * Will not change pose if the companion is dying or sleeping.
-     * Use this method instead of manually clearing shift key to ensure the pose is also reset.
+     * Use this method instead of manually clearing shift key to ensure the pose is
+     * also reset.
      */
     public void stopSneaking() {
         this.setShiftKeyDown(false);
         if (this.getPose() == Pose.CROUCHING) {
             this.setPose(Pose.STANDING);
+        }
+        AttributeInstance speed = this.getAttribute(Attributes.MOVEMENT_SPEED);
+        if (speed != null) {
+            speed.removeModifier(SNEAK_SPEED_MODIFIER_ID);
         }
     }
 
@@ -700,8 +730,7 @@ public class CompanionEntity extends PathfinderMob implements RangedAttackMob {
         // Create the chat message with companion's name
         net.minecraft.network.chat.Component message = net.minecraft.network.chat.Component.translatable(
                 "chat.immersivecompanions.recruited." + messageIndex,
-                companionName
-        );
+                companionName);
 
         // Send only to this player (system message)
         player.sendSystemMessage(message);
@@ -754,7 +783,8 @@ public class CompanionEntity extends PathfinderMob implements RangedAttackMob {
     }
 
     /**
-     * Gets the skin info for this companion, including texture and slim/wide model status.
+     * Gets the skin info for this companion, including texture and slim/wide model
+     * status.
      * Used by the renderer to determine which model variant to use.
      */
     public SkinInfo getSkinInfo() {
@@ -860,7 +890,7 @@ public class CompanionEntity extends PathfinderMob implements RangedAttackMob {
         double dz = target.getZ() - this.getZ();
         double distance = Math.sqrt(dx * dx + dz * dz);
 
-        arrow.shoot(dx, dy + distance * 0.2, dz, 1.6F, (float)(14 - this.level().getDifficulty().getId() * 4));
+        arrow.shoot(dx, dy + distance * 0.2, dz, 1.6F, (float) (14 - this.level().getDifficulty().getId() * 4));
         this.playSound(SoundEvents.SKELETON_SHOOT, 1.0F, 1.0F / (this.getRandom().nextFloat() * 0.4F + 0.8F));
         this.level().addFreshEntity(arrow);
     }
@@ -875,7 +905,7 @@ public class CompanionEntity extends PathfinderMob implements RangedAttackMob {
         double distance = Math.sqrt(dx * dx + dz * dz);
 
         // Crossbows are faster and more accurate
-        arrow.shoot(dx, dy + distance * 0.15, dz, 2.0F, (float)(10 - this.level().getDifficulty().getId() * 4));
+        arrow.shoot(dx, dy + distance * 0.15, dz, 2.0F, (float) (10 - this.level().getDifficulty().getId() * 4));
         this.playSound(SoundEvents.CROSSBOW_SHOOT, 1.0F, 1.0F / (this.getRandom().nextFloat() * 0.4F + 0.8F));
         this.level().addFreshEntity(arrow);
     }
@@ -901,7 +931,8 @@ public class CompanionEntity extends PathfinderMob implements RangedAttackMob {
     }
 
     private void spreadNegativeGossip(Player player) {
-        if (!(this.level() instanceof ServerLevel serverLevel)) return;
+        if (!(this.level() instanceof ServerLevel serverLevel))
+            return;
 
         // Find nearby villagers
         AABB searchBox = this.getBoundingBox().inflate(16.0);
@@ -957,15 +988,6 @@ public class CompanionEntity extends PathfinderMob implements RangedAttackMob {
 
             // Mode tick
             this.currentMode.tick(this);
-        }
-
-        // Handle forced crouching from conditions (runs on both sides for rendering)
-        // NOTE: Only FORCES crouch when conditions require it.
-        // Clearing crouch is the responsibility of whoever set it:
-        // - When condition is removed → condition's onRemove clears it
-        // - MimicOwnerGoal manages owner-based crouching separately
-        if (shouldForceCrouch()) {
-            startSneaking();
         }
     }
 

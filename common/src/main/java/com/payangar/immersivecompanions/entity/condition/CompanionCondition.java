@@ -103,14 +103,4 @@ public interface CompanionCondition {
      * @param entity The companion entity
      */
     default void tick(CompanionEntity entity) {}
-
-    /**
-     * Checks if this condition forces the companion to crouch.
-     * Used for conditions like critical injury that require crouching.
-     *
-     * @return true if the companion should be forced to crouch
-     */
-    default boolean forcesCrouching() {
-        return false;
-    }
 }

@@ -95,3 +95,14 @@ if (!companion.canPerformAction(ActionType.CLIMB)) {
 | `canPerformAction(ActionType)` | Check if action is allowed |
 | `isCombatDisabled()` | Check if any condition blocks combat |
 | `shouldForceCrouch()` | Check if any condition forces crouching |
+
+---
+
+# ModConfig
+
+## Adding a New ModConfig Entry
+
+When adding a new config option to `ModConfig`, you must also handle the client-side config screen:
+
+1. Add the field and getter to `ModConfig.java`
+2. Update the client-side config screen to include the new option for editing

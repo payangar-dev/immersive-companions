@@ -111,9 +111,6 @@ public class CriticalInjuryCondition implements CompanionCondition {
             speed.addTransientModifier(modifier);
         }
 
-        // Set crouching state so isCrouching() returns true
-        entity.setShiftKeyDown(true);
-
         // Register condition goals
         entity.registerConditionGoals(this);
     }
@@ -126,8 +123,7 @@ public class CriticalInjuryCondition implements CompanionCondition {
             speed.removeModifier(SPEED_PENALTY_ID);
         }
 
-        // Clear crouching state
-        entity.setShiftKeyDown(false);
+        entity.stopSneaking();
 
         // Unregister condition goals
         entity.removeConditionGoals(this);

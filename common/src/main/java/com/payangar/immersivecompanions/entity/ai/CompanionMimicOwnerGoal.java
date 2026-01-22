@@ -1,7 +1,6 @@
 package com.payangar.immersivecompanions.entity.ai;
 
 import com.payangar.immersivecompanions.entity.CompanionEntity;
-import net.minecraft.world.entity.Pose;
 import net.minecraft.world.entity.ai.goal.Goal;
 import net.minecraft.world.entity.player.Player;
 
@@ -38,15 +37,11 @@ public class CompanionMimicOwnerGoal extends Goal {
 
         boolean ownerSneaking = owner.isCrouching();
 
-        if (ownerSneaking && !wasSneaking) {
-            // Owner started sneaking
-            companion.setShiftKeyDown(true);
-            companion.setPose(Pose.CROUCHING);
+        if (ownerSneaking && !companion.isCrouching()) {
+            companion.startSneaking();
             wasSneaking = true;
-        } else if (!ownerSneaking && wasSneaking) {
-            // Owner stopped sneaking
-            companion.setShiftKeyDown(false);
-            companion.setPose(Pose.STANDING);
+        } else if (!ownerSneaking && companion.isCrouching()) {
+            companion.stopSneaking();
             wasSneaking = false;
         }
     }
@@ -55,8 +50,7 @@ public class CompanionMimicOwnerGoal extends Goal {
     public void stop() {
         // Reset sneaking state when goal stops
         if (wasSneaking) {
-            companion.setShiftKeyDown(false);
-            companion.setPose(Pose.STANDING);
+            companion.stopSneaking();
             wasSneaking = false;
         }
     }

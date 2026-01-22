@@ -453,14 +453,6 @@ public class CompanionEntity extends PathfinderMob implements RangedAttackMob {
     }
 
     /**
-     * Cycles to the next combat stance in order.
-     * Order: PASSIVE → DEFENSIVE → ASSIST → AGGRESSIVE → PASSIVE
-     */
-    public void cycleCombatStance() {
-        setCombatStance(CombatStances.next(currentStance));
-    }
-
-    /**
      * Registers goals from a stance.
      */
     private void registerStanceGoals(CombatStance stance) {
@@ -605,6 +597,33 @@ public class CompanionEntity extends PathfinderMob implements RangedAttackMob {
     public boolean shouldForceCrouch() {
         return activeConditions.stream()
                 .anyMatch(CompanionCondition::forcesCrouching);
+    }
+
+    // ========== Sneaking State Management ==========
+
+    /**
+     * Starts sneaking for this companion.
+     * Sets both the shift key state and the crouching pose.
+     * Use this method instead of manually setting shift key and pose to ensure consistency.
+     */
+    public void startSneaking() {
+        this.setShiftKeyDown(true);
+        if (this.getPose() != Pose.DYING && this.getPose() != Pose.SLEEPING) {
+            this.setPose(Pose.CROUCHING);
+        }
+    }
+
+    /**
+     * Stops sneaking for this companion.
+     * Clears the shift key state and restores the standing pose.
+     * Will not change pose if the companion is dying or sleeping.
+     * Use this method instead of manually clearing shift key to ensure the pose is also reset.
+     */
+    public void stopSneaking() {
+        this.setShiftKeyDown(false);
+        if (this.getPose() == Pose.CROUCHING) {
+            this.setPose(Pose.STANDING);
+        }
     }
 
     // ========== Owner System ==========
@@ -946,10 +965,7 @@ public class CompanionEntity extends PathfinderMob implements RangedAttackMob {
         // - When condition is removed → condition's onRemove clears it
         // - MimicOwnerGoal manages owner-based crouching separately
         if (shouldForceCrouch()) {
-            this.setShiftKeyDown(true);
-            if (this.getPose() != Pose.DYING && this.getPose() != Pose.SLEEPING) {
-                this.setPose(Pose.CROUCHING);
-            }
+            startSneaking();
         }
     }
 

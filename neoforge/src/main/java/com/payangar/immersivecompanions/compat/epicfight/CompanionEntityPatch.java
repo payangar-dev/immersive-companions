@@ -2,8 +2,12 @@ package com.payangar.immersivecompanions.compat.epicfight;
 
 import com.payangar.immersivecompanions.entity.CompanionEntity;
 import net.minecraft.world.InteractionHand;
+import net.minecraft.world.item.CrossbowItem;
+import net.minecraft.world.item.UseAnim;
 import yesman.epicfight.api.animation.Animator;
 import yesman.epicfight.api.animation.LivingMotions;
+import yesman.epicfight.api.animation.types.StaticAnimation;
+import yesman.epicfight.api.client.animation.Layer.Priority;
 import yesman.epicfight.api.utils.math.OpenMatrix4f;
 import yesman.epicfight.gameasset.Animations;
 import yesman.epicfight.model.armature.types.ToolHolderArmature;
@@ -15,19 +19,17 @@ import yesman.epicfight.world.entity.ai.goal.TargetChasingGoal;
 
 /**
  * Epic Fight entity patch for CompanionEntity.
- * Extends HumanoidMobPatch to provide humanoid combat animations for companions.
+ * Extends HumanoidMobPatch to provide humanoid combat animations for
+ * companions.
  * This enables companions to use Epic Fight's biped animations for combat,
  * walking, idle, and other actions. Supports both melee and ranged combat.
- * Ranged weapon animations (bow/crossbow) come from the weapon capability system.
+ * Ranged weapon animations (bow/crossbow) come from the weapon capability
+ * system.
  */
 public class CompanionEntityPatch extends HumanoidMobPatch<CompanionEntity> {
 
     public CompanionEntityPatch(CompanionEntity original) {
-        super(original, Factions.VILLAGER);  // Allies with villagers, hostile to undead
-
-        // Set up callback to trigger shooting animation after ranged attacks
-        // This replaces what Epic Fight's mixins do for vanilla RangedAttackGoal
-        original.setOnRangedAttackCallback(this::playShootingAnimation);
+        super(original, Factions.VILLAGER); // Allies with villagers, hostile to undead
     }
 
     @Override
@@ -61,55 +63,56 @@ public class CompanionEntityPatch extends HumanoidMobPatch<CompanionEntity> {
 
     @Override
     public void updateMotion(boolean considerInaction) {
-        // Let death animation play normally
-        if (this.original.isDeadOrDying()) {
-            this.currentLivingMotion = LivingMotions.DEATH;
-            return;
-        }
-
         // Handle weapon holstering when not in combat (Epic Fight uses weapon on back)
         updateWeaponHolstering();
 
-        // Handle crouching state (from any source: critical injury, owner mimic, etc.)
-        if (this.original.isCrouching()) {
-            if (this.original.walkAnimation.speed() > 0.01F) {
-                this.currentLivingMotion = LivingMotions.SNEAK;
-            } else {
+        if (this.original.isDeadOrDying()) {
+            this.currentLivingMotion = LivingMotions.DEATH;
+        } else if (this.state.inaction() && considerInaction) {
+            if (this.original.isCrouching()) {
                 this.currentLivingMotion = LivingMotions.KNEEL;
+            } else {
+                this.currentLivingMotion = LivingMotions.IDLE;
             }
-            return;
-        }
-
-        // When holstered, use custom basic locomotion that bypasses weapon pose modifications
-        // When drawn, use ranged mob motion for aiming/shooting animations
-        if (this.original.isWeaponHolstered()) {
-            updateHolsteredMotion(considerInaction);
-        } else {
-            super.commonAggressiveRangedMobUpdateMotion(considerInaction);
-        }
-    }
-
-    /**
-     * Custom locomotion update for when weapon is holstered.
-     * Directly sets living motions without calling parent methods that apply weapon-specific poses.
-     * This ensures companions have natural hand positions when their weapon is on their back.
-     */
-    private void updateHolsteredMotion(boolean considerInaction) {
-        if (this.original.getVehicle() != null) {
+        } else if (this.original.getVehicle() != null) {
             this.currentLivingMotion = LivingMotions.MOUNT;
         } else if (!this.original.onGround() && this.original.getDeltaMovement().y > 0.0) {
             this.currentLivingMotion = LivingMotions.JUMP;
         } else if (!this.original.onGround() && this.original.getDeltaMovement().y < -0.5) {
             this.currentLivingMotion = LivingMotions.FALL;
         } else if (this.original.walkAnimation.speed() > 0.01F) {
-            // Determine if walking or running based on movement speed
-            if (this.original.isSprinting()) {
+            if (this.original.isCrouching()) {
+                this.currentLivingMotion = LivingMotions.SNEAK;
+            } else if (this.original.isSprinting()) {
                 this.currentLivingMotion = LivingMotions.CHASE;
             } else {
                 this.currentLivingMotion = LivingMotions.WALK;
             }
+        } else if (this.original.isCrouching()) {
+            this.currentLivingMotion = LivingMotions.KNEEL;
         } else {
             this.currentLivingMotion = LivingMotions.IDLE;
+        }
+        this.currentCompositeMotion = this.currentLivingMotion;
+
+        if (this.original.isWeaponHolstered() || !this.original.getCombatType().isRanged())
+            return;
+
+        // Ranged combat animations
+        UseAnim useAction = this.original.getItemInHand(this.original.getUsedItemHand()).getUseAnimation();
+        if (((StaticAnimation) this.getClientAnimator().getCompositeLayer(Priority.MIDDLE).animationPlayer
+                .getRealAnimation().get()).isReboundAnimation()) {
+            this.currentCompositeMotion = LivingMotions.SHOT;
+        } else if (this.original.isUsingItem()) {
+            if (useAction == UseAnim.CROSSBOW) {
+                this.currentCompositeMotion = LivingMotions.RELOAD;
+            } else {
+                this.currentCompositeMotion = LivingMotions.AIM;
+            }
+        } else if (CrossbowItem.isCharged(this.original.getMainHandItem())) {
+            this.currentCompositeMotion = LivingMotions.AIM;
+        } else {
+            this.currentCompositeMotion = this.currentLivingMotion;
         }
     }
 

@@ -41,8 +41,8 @@ public class ConditionalItemInHandLayer extends ItemInHandLayer<CompanionEntity,
             return;
         }
 
-        // When in combat (aggressive), always render items in hand
-        if (entity.isAggressive()) {
+        // When weapon is drawn (not holstered), render items in hand
+        if (!entity.isWeaponHolstered()) {
             super.render(poseStack, buffer, packedLight, entity, limbSwing, limbSwingAmount,
                     partialTicks, ageInTicks, netHeadYaw, headPitch);
             return;

@@ -86,6 +86,8 @@ public class CompanionEntity extends PathfinderMob implements RangedAttackMob {
             CompanionEntity.class, EntityDataSerializers.STRING);
     private static final EntityDataAccessor<String> DATA_COMBAT_STANCE = SynchedEntityData.defineId(
             CompanionEntity.class, EntityDataSerializers.STRING);
+    private static final EntityDataAccessor<Boolean> DATA_WEAPON_HOLSTERED = SynchedEntityData.defineId(
+            CompanionEntity.class, EntityDataSerializers.BOOLEAN);
 
     /** Default team for village-spawned companions */
     public static final String DEFAULT_TEAM = "village_guard";
@@ -162,6 +164,7 @@ public class CompanionEntity extends PathfinderMob implements RangedAttackMob {
         builder.define(DATA_BASE_PRICE, 0);
         builder.define(DATA_MODE_ID, CompanionMode.WANDER.getId());
         builder.define(DATA_COMBAT_STANCE, CombatStance.AGGRESSIVE.getId());
+        builder.define(DATA_WEAPON_HOLSTERED, true); // Default: weapon holstered
     }
 
     @Override
@@ -503,6 +506,28 @@ public class CompanionEntity extends PathfinderMob implements RangedAttackMob {
         }
     }
 
+    // ========== Weapon Holster State ==========
+
+    /**
+     * Checks if the companion's weapon is holstered.
+     * When holstered, arms are lowered and weapon is hidden/on back.
+     *
+     * @return true if weapon is holstered, false if drawn
+     */
+    public boolean isWeaponHolstered() {
+        return this.entityData.get(DATA_WEAPON_HOLSTERED);
+    }
+
+    /**
+     * Sets the weapon holster state.
+     * Called by combat goals when entering/exiting combat.
+     *
+     * @param holstered true to holster weapon, false to draw weapon
+     */
+    public void setWeaponHolstered(boolean holstered) {
+        this.entityData.set(DATA_WEAPON_HOLSTERED, holstered);
+    }
+
     // ========== Condition System ==========
 
     /**
@@ -764,6 +789,7 @@ public class CompanionEntity extends PathfinderMob implements RangedAttackMob {
         tag.putInt("BasePrice", getBasePrice());
         tag.putString("ModeId", currentMode.getId());
         tag.putString("CombatStance", currentStance.getId());
+        tag.putBoolean("WeaponHolstered", isWeaponHolstered());
         if (ownerUUID != null) {
             tag.putUUID("OwnerUUID", ownerUUID);
         }
@@ -804,6 +830,9 @@ public class CompanionEntity extends PathfinderMob implements RangedAttackMob {
             CombatStance stance = CombatStance.byId(stanceId);
             this.currentStance = stance;
             this.entityData.set(DATA_COMBAT_STANCE, stance.getId());
+        }
+        if (tag.contains("WeaponHolstered")) {
+            setWeaponHolstered(tag.getBoolean("WeaponHolstered"));
         }
 
         // Register with teleport handler if in FOLLOW mode with an owner

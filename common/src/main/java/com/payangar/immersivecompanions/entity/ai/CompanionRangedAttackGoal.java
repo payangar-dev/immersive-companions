@@ -108,12 +108,14 @@ public class CompanionRangedAttackGoal extends Goal {
     public void start() {
         super.start();
         companion.setAggressive(true);
+        companion.setWeaponHolstered(false); // Draw weapon
     }
 
     @Override
     public void stop() {
         super.stop();
         companion.setAggressive(false);
+        companion.setWeaponHolstered(true); // Holster weapon
         companion.setCharging(false);
         companion.stopUsingItem();
         isCharging = false;

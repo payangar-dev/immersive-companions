@@ -45,11 +45,13 @@ public class CompanionMeleeAttackGoal extends MeleeAttackGoal {
     public void start() {
         super.start();
         companion.setAggressive(true);
+        companion.setWeaponHolstered(false); // Draw weapon
     }
 
     @Override
     public void stop() {
         super.stop();
         companion.setAggressive(false);
+        companion.setWeaponHolstered(true); // Holster weapon
     }
 }

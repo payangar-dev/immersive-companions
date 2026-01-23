@@ -68,9 +68,18 @@ public class CompanionRenderer extends HumanoidMobRenderer<CompanionEntity, Play
     }
 
     /**
-     * Sets the model's arm pose based on the companion's charging state and held weapon.
+     * Sets the model's arm pose based on the companion's holster state, charging state, and held weapon.
+     * When weapon is holstered, arms stay lowered. When drawn, applies appropriate weapon poses.
      */
     private void setModelArmPose(CompanionEntity entity) {
+        // When weapon is holstered, keep arms lowered
+        if (entity.isWeaponHolstered()) {
+            this.model.rightArmPose = HumanoidModel.ArmPose.EMPTY;
+            this.model.leftArmPose = HumanoidModel.ArmPose.EMPTY;
+            return;
+        }
+
+        // Weapon drawn - apply poses based on held item and charging state
         ItemStack mainHand = entity.getMainHandItem();
         HumanoidModel.ArmPose armPose = HumanoidModel.ArmPose.EMPTY;
 

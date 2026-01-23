@@ -85,9 +85,9 @@ public class CompanionEntityPatch extends HumanoidMobPatch<CompanionEntity> {
     }
 
     /**
-     * Updates weapon positioning based on combat state.
-     * When not in combat, moves weapons to the back.
-     * When in combat, moves weapons to hands.
+     * Updates weapon positioning based on holster state.
+     * When holstered, moves weapons to the back.
+     * When drawn, moves weapons to hands.
      */
     private void updateWeaponHolstering() {
         if (!ModConfig.get().isEnableWeaponHolstering()) {
@@ -98,14 +98,14 @@ public class CompanionEntityPatch extends HumanoidMobPatch<CompanionEntity> {
             return;
         }
 
-        boolean inCombat = this.original.isAggressive();
+        boolean weaponDrawn = !this.original.isWeaponHolstered();
 
-        if (!inCombat && !isWeaponOnBack()) {
-            // Move weapons to back when not in combat
+        if (!weaponDrawn && !isWeaponOnBack()) {
+            // Move weapons to back when holstered
             this.setParentJointOfHand(InteractionHand.MAIN_HAND, toolArmature.backToolJoint());
             this.setParentJointOfHand(InteractionHand.OFF_HAND, toolArmature.backToolJoint());
-        } else if (inCombat && isWeaponOnBack()) {
-            // Move weapons to hands when entering combat
+        } else if (weaponDrawn && isWeaponOnBack()) {
+            // Move weapons to hands when drawn
             this.setParentJointOfHand(InteractionHand.MAIN_HAND, toolArmature.rightToolJoint());
             this.setParentJointOfHand(InteractionHand.OFF_HAND, toolArmature.leftToolJoint());
         }

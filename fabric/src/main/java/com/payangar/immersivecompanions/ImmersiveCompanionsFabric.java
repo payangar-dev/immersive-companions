@@ -1,5 +1,6 @@
 package com.payangar.immersivecompanions;
 
+import com.payangar.immersivecompanions.command.ModCommands;
 import com.payangar.immersivecompanions.config.ModConfig;
 import com.payangar.immersivecompanions.entity.CompanionEntity;
 import com.payangar.immersivecompanions.entity.CompanionTeleportHandler;
@@ -10,6 +11,7 @@ import com.payangar.immersivecompanions.platform.Services;
 import com.payangar.immersivecompanions.registry.FabricEntityRegistration;
 import com.payangar.immersivecompanions.spawning.CompanionSpawnLogic;
 import net.fabricmc.api.ModInitializer;
+import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
 import net.fabricmc.fabric.api.entity.event.v1.ServerEntityWorldChangeEvents;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerEntityEvents;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents;
@@ -28,6 +30,11 @@ public class ImmersiveCompanionsFabric implements ModInitializer {
 
         // Register networking payloads
         FabricNetworking.registerPayloads();
+
+        // Register commands
+        CommandRegistrationCallback.EVENT.register((dispatcher, registryAccess, environment) -> {
+            ModCommands.register(dispatcher);
+        });
 
         // Clear tracked chunks and teleport registry on server stop
         ServerLifecycleEvents.SERVER_STOPPED.register(server -> {

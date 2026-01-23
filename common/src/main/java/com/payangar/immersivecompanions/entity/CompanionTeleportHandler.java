@@ -21,6 +21,31 @@ import java.util.concurrent.ConcurrentHashMap;
  */
 public class CompanionTeleportHandler {
 
+    /**
+     * Public record for exposing tracked companion info to debug commands.
+     */
+    public record TrackedCompanionInfo(UUID companionId, ResourceKey<Level> dimension, BlockPos lastPos) {}
+
+    /**
+     * Returns a snapshot of the registry for debug purposes.
+     * Maps player UUID to list of their tracked companions.
+     */
+    public static Map<UUID, List<TrackedCompanionInfo>> getRegistrySnapshot() {
+        Map<UUID, List<TrackedCompanionInfo>> snapshot = new HashMap<>();
+        for (Map.Entry<UUID, Set<TrackedCompanion>> entry : registry.entrySet()) {
+            List<TrackedCompanionInfo> companions = new ArrayList<>();
+            for (TrackedCompanion tracked : entry.getValue()) {
+                companions.add(new TrackedCompanionInfo(
+                        tracked.companionId,
+                        tracked.dimension,
+                        tracked.lastPos
+                ));
+            }
+            snapshot.put(entry.getKey(), companions);
+        }
+        return snapshot;
+    }
+
     // === Companion Registry ===
     // Maps player UUID -> Set of their companion UUIDs in FOLLOW mode
     // Also tracks companion dimension and position for loading their chunk

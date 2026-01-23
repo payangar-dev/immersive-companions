@@ -1,6 +1,7 @@
 package com.payangar.immersivecompanions.events;
 
 import com.payangar.immersivecompanions.ImmersiveCompanions;
+import com.payangar.immersivecompanions.command.ModCommands;
 import com.payangar.immersivecompanions.config.ModConfig;
 import com.payangar.immersivecompanions.entity.CompanionEntity;
 import com.payangar.immersivecompanions.entity.CompanionTeleportHandler;
@@ -21,6 +22,7 @@ import net.minecraft.world.level.levelgen.structure.StructureStart;
 import net.minecraft.world.phys.Vec3;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
+import net.neoforged.neoforge.event.RegisterCommandsEvent;
 import net.neoforged.neoforge.event.entity.EntityJoinLevelEvent;
 import net.neoforged.neoforge.event.entity.EntityTeleportEvent;
 import net.neoforged.neoforge.event.level.ChunkEvent;
@@ -105,6 +107,11 @@ public class NeoForgeSpawnEvents {
     public static void onServerStopped(ServerStoppedEvent event) {
         CompanionSpawnLogic.clearTrackedChunks();
         CompanionTeleportHandler.clear();
+    }
+
+    @SubscribeEvent
+    public static void onRegisterCommands(RegisterCommandsEvent event) {
+        ModCommands.register(event.getDispatcher());
     }
 
     /**

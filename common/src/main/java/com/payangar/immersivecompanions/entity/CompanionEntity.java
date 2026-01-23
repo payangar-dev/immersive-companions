@@ -988,6 +988,12 @@ public class CompanionEntity extends PathfinderMob implements RangedAttackMob {
     }
 
     @Override
+    public void aiStep() {
+        updateSwingTime();  // Required for melee attack animation to work
+        super.aiStep();
+    }
+
+    @Override
     public void remove(RemovalReason reason) {
         // Unregister from teleport handler before removal
         // Use explicit IDs in case entity state is modified during removal

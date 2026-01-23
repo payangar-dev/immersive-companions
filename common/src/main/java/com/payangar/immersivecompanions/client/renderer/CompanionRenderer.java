@@ -61,6 +61,10 @@ public class CompanionRenderer extends HumanoidMobRenderer<CompanionEntity, Play
         // doesn't set this for non-player entities (unlike PlayerRenderer)
         this.model.crouching = entity.isCrouching();
 
+        // Set attack animation progress for melee swing animation
+        // Must be done after model swap since attackTime is per-model-instance
+        this.model.attackTime = entity.getAttackAnim(partialTicks);
+
         // Set arm pose based on charging state
         setModelArmPose(entity);
 
@@ -72,6 +76,12 @@ public class CompanionRenderer extends HumanoidMobRenderer<CompanionEntity, Play
      * When weapon is holstered, arms stay lowered. When drawn, applies appropriate weapon poses.
      */
     private void setModelArmPose(CompanionEntity entity) {
+        // During melee swing, let vanilla HumanoidModel.setupAnim() handle the arm animation
+        // Only skip for melee companions (ranged have their own arm poses that should be maintained)
+        if (entity.swinging && !entity.getCombatType().isRanged()) {
+            return;
+        }
+
         // When weapon is holstered, keep arms lowered
         if (entity.isWeaponHolstered()) {
             this.model.rightArmPose = HumanoidModel.ArmPose.EMPTY;

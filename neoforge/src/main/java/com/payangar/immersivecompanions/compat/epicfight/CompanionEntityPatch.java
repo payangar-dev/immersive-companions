@@ -39,6 +39,7 @@ public class CompanionEntityPatch extends HumanoidMobPatch<CompanionEntity> {
         animator.addLivingAnimation(LivingMotions.IDLE, Animations.BIPED_IDLE);
         animator.addLivingAnimation(LivingMotions.WALK, Animations.BIPED_WALK);
         animator.addLivingAnimation(LivingMotions.CHASE, Animations.BIPED_RUN);
+        animator.addLivingAnimation(LivingMotions.JUMP, Animations.BIPED_JUMP);
         animator.addLivingAnimation(LivingMotions.FALL, Animations.BIPED_FALL);
         animator.addLivingAnimation(LivingMotions.MOUNT, Animations.BIPED_MOUNT);
         animator.addLivingAnimation(LivingMotions.DEATH, Animations.BIPED_DEATH);
@@ -80,8 +81,37 @@ public class CompanionEntityPatch extends HumanoidMobPatch<CompanionEntity> {
         // Handle weapon holstering when not in combat (Epic Fight uses weapon on back)
         updateWeaponHolstering();
 
-        // Use ranged mob motion update - detects isUsingItem() for bow/crossbow animations
-        super.commonAggressiveRangedMobUpdateMotion(considerInaction);
+        // When holstered, use custom basic locomotion that bypasses weapon pose modifications
+        // When drawn, use ranged mob motion for aiming/shooting animations
+        if (this.original.isWeaponHolstered()) {
+            updateHolsteredMotion(considerInaction);
+        } else {
+            super.commonAggressiveRangedMobUpdateMotion(considerInaction);
+        }
+    }
+
+    /**
+     * Custom locomotion update for when weapon is holstered.
+     * Directly sets living motions without calling parent methods that apply weapon-specific poses.
+     * This ensures companions have natural hand positions when their weapon is on their back.
+     */
+    private void updateHolsteredMotion(boolean considerInaction) {
+        if (this.original.getVehicle() != null) {
+            this.currentLivingMotion = LivingMotions.MOUNT;
+        } else if (!this.original.onGround() && this.original.getDeltaMovement().y > 0.0) {
+            this.currentLivingMotion = LivingMotions.JUMP;
+        } else if (!this.original.onGround() && this.original.getDeltaMovement().y < -0.5) {
+            this.currentLivingMotion = LivingMotions.FALL;
+        } else if (this.original.walkAnimation.speed() > 0.01F) {
+            // Determine if walking or running based on movement speed
+            if (this.original.isSprinting()) {
+                this.currentLivingMotion = LivingMotions.CHASE;
+            } else {
+                this.currentLivingMotion = LivingMotions.WALK;
+            }
+        } else {
+            this.currentLivingMotion = LivingMotions.IDLE;
+        }
     }
 
     /**

@@ -1,5 +1,6 @@
 package com.payangar.immersivecompanions.compat.epicfight;
 
+import com.mojang.blaze3d.vertex.PoseStack;
 import com.payangar.immersivecompanions.entity.CompanionEntity;
 import net.minecraft.client.model.HumanoidModel;
 import net.minecraft.client.renderer.entity.EntityRendererProvider;
@@ -45,6 +46,19 @@ public class PCompanionRenderer extends PatchedLivingEntityRenderer<LivingEntity
     public void setJointTransforms(LivingEntityPatch<LivingEntity> entitypatch, Armature armature, Pose pose, float partialTicks) {
         if (entitypatch.getOriginal().isBaby()) {
             pose.orElseEmpty("Head").frontResult(JointTransform.scale(new Vec3f(1.25F, 1.25F, 1.25F)), OpenMatrix4f::mul);
+        }
+    }
+
+    @Override
+    public void mulPoseStack(PoseStack poseStack, Armature armature, LivingEntity entity,
+            LivingEntityPatch<LivingEntity> entitypatch, float partialTicks) {
+        super.mulPoseStack(poseStack, armature, entity, entitypatch, partialTicks);
+
+        // The parent applies 0.15D translation for crouching, designed for full-scale entities.
+        // Since companions are scaled to 0.9375, correct for the excess translation.
+        if (entity.isCrouching()) {
+            double excessTranslation = 0.15D * (1.0D - CompanionEntity.RENDER_SCALE);
+            poseStack.translate(0.0D, -excessTranslation, 0.0D);
         }
     }
 

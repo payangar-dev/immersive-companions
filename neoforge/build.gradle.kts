@@ -6,6 +6,10 @@ base {
     archivesName.set("${project.property("mod_id")}-neoforge")
 }
 
+configurations {
+    create("vscode")
+}
+
 val mod_id: String by project
 val mod_name: String by project
 val mod_version: String by project
@@ -67,6 +71,12 @@ dependencies {
 
     // Config GUI
     implementation("dev.isxander:yet-another-config-lib:${yacl_version}-neoforge")
+
+    "vscode"("maven.modrinth:epic-fight:21.14.4-mc1.21.1-neoforge")
+}
+
+java {
+    sourceSets["main"].compileClasspath += configurations["vscode"]
 }
 
 tasks.jar {

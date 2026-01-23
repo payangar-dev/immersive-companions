@@ -25,7 +25,6 @@ public class ModConfig {
     public static float criticalInjuryThreshold = 4.0f;
     public static float criticalInjurySpeedMultiplier = 0.5f;
     public static boolean enableMonstersTargetCompanions = true;
-    public static boolean enableWeaponHolstering = true;
     public static boolean enableTeamCoordination = true;
     public static float teamCoordinationRange = 16.0f;
 
@@ -35,7 +34,6 @@ public class ModConfig {
         float criticalInjuryThreshold = 4.0f;
         float criticalInjurySpeedMultiplier = 0.5f;
         boolean enableMonstersTargetCompanions = true;
-        boolean enableWeaponHolstering = true;
         boolean enableTeamCoordination = true;
         float teamCoordinationRange = 16.0f;
     }
@@ -80,14 +78,6 @@ public class ModConfig {
     }
 
     /**
-     * Whether weapon holstering is enabled.
-     * When enabled, companions will display their weapons on their belt or back when not in combat.
-     */
-    public boolean isEnableWeaponHolstering() {
-        return enableWeaponHolstering;
-    }
-
-    /**
      * Whether team coordination is enabled.
      * When enabled, companions will defend teammates being attacked and assist teammates in combat.
      */
@@ -119,7 +109,6 @@ public class ModConfig {
                     criticalInjuryThreshold = data.criticalInjuryThreshold;
                     criticalInjurySpeedMultiplier = data.criticalInjurySpeedMultiplier;
                     enableMonstersTargetCompanions = data.enableMonstersTargetCompanions;
-                    enableWeaponHolstering = data.enableWeaponHolstering;
                     enableTeamCoordination = data.enableTeamCoordination;
                     teamCoordinationRange = data.teamCoordinationRange;
                 }
@@ -147,7 +136,6 @@ public class ModConfig {
             data.criticalInjuryThreshold = criticalInjuryThreshold;
             data.criticalInjurySpeedMultiplier = criticalInjurySpeedMultiplier;
             data.enableMonstersTargetCompanions = enableMonstersTargetCompanions;
-            data.enableWeaponHolstering = enableWeaponHolstering;
             data.enableTeamCoordination = enableTeamCoordination;
             data.teamCoordinationRange = teamCoordinationRange;
             String json = GSON.toJson(data);

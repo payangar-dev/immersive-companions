@@ -66,7 +66,7 @@ import java.util.UUID;
 public class CompanionEntity extends PathfinderMob implements RangedAttackMob {
 
     /** Scale factor to match player size (15/16 = 0.9375) */
-    public static final float RENDER_SCALE = 0.9375F;
+    public static final float RENDER_SCALE = 0.93F;
 
     private static final EntityDataAccessor<Integer> DATA_GENDER = SynchedEntityData.defineId(
             CompanionEntity.class, EntityDataSerializers.INT);
@@ -117,6 +117,18 @@ public class CompanionEntity extends PathfinderMob implements RangedAttackMob {
 
     /** Maximum ticks before interaction auto-clears (30 seconds = 600 ticks) */
     private static final int INTERACTION_TIMEOUT_TICKS = 600;
+
+    /**
+     * Delay in ticks before holstering weapon after losing target (100 ticks = 5
+     * seconds)
+     */
+    private static final int WEAPON_HOLSTER_DELAY_TICKS = 100;
+
+    /**
+     * Tracks ticks since the companion last had a valid target.
+     * Used for delayed weapon holstering. Server-side only, not persisted.
+     */
+    private int ticksSinceLastTarget = Integer.MAX_VALUE;
 
     /** UUID of the player who owns this companion (null if unbought) */
     @Nullable
@@ -173,7 +185,8 @@ public class CompanionEntity extends PathfinderMob implements RangedAttackMob {
         // All goals are registered once; they use canUse()/canContinueToUse() to
         // determine when to run based on mode, stance, and conditions.
 
-        // Priority 0: Interaction - stops movement and looks at player during recruitment screen
+        // Priority 0: Interaction - stops movement and looks at player during
+        // recruitment screen
         this.goalSelector.addGoal(0, new CompanionInteractionGoal(this));
 
         // Priority 1: Swimming (respects conditions via CompanionFloatGoal)
@@ -212,13 +225,15 @@ public class CompanionEntity extends PathfinderMob implements RangedAttackMob {
         // Priority 3: Defend teammates (active when canDefendTeammates() returns true)
         this.targetSelector.addGoal(3, new CompanionDefendTeammatesGoal(this));
 
-        // Priority 3: Team coordination - defend and assist (active when canAssistTeammates() returns true)
+        // Priority 3: Team coordination - defend and assist (active when
+        // canAssistTeammates() returns true)
         this.targetSelector.addGoal(3, new CompanionTeamCoordinationGoal(this));
 
         // Priority 4: Assist owner (active when canAssistOwner() returns true)
         this.targetSelector.addGoal(4, new CompanionAssistOwnerGoal(this));
 
-        // Priority 5: Proactively attack monsters (active when canProactivelyAttack() returns true)
+        // Priority 5: Proactively attack monsters (active when canProactivelyAttack()
+        // returns true)
         this.targetSelector.addGoal(5, new CompanionNearestAttackableTargetGoal(this));
 
         // Priority 6: Defend village (active when canDefendVillage() returns true)
@@ -379,7 +394,8 @@ public class CompanionEntity extends PathfinderMob implements RangedAttackMob {
 
     /**
      * Sets the behavioral mode.
-     * Goals check the mode in their canUse() methods, so no goal manipulation needed.
+     * Goals check the mode in their canUse() methods, so no goal manipulation
+     * needed.
      *
      * @param mode The new mode to set
      */
@@ -488,7 +504,8 @@ public class CompanionEntity extends PathfinderMob implements RangedAttackMob {
 
     /**
      * Sets the combat stance.
-     * Goals check the stance in their canUse() methods, so no goal manipulation needed.
+     * Goals check the stance in their canUse() methods, so no goal manipulation
+     * needed.
      *
      * @param stance The new stance to set
      */
@@ -526,6 +543,33 @@ public class CompanionEntity extends PathfinderMob implements RangedAttackMob {
      */
     public void setWeaponHolstered(boolean holstered) {
         this.entityData.set(DATA_WEAPON_HOLSTERED, holstered);
+    }
+
+    /**
+     * Updates weapon holster state based on target presence.
+     * Should be called every tick on the server side.
+     *
+     * Logic:
+     * - If combat is disabled, weapon stays holstered
+     * - If companion has a valid target, draw weapon immediately and reset counter
+     * - If no target, increment counter and holster after configured delay
+     */
+    private void updateWeaponHolsterState() {
+        LivingEntity target = getTarget();
+        boolean hasValidTarget = target != null && target.isAlive();
+
+        if (hasValidTarget) {
+            ticksSinceLastTarget = 0;
+        } else if (ticksSinceLastTarget < WEAPON_HOLSTER_DELAY_TICKS) {
+            ticksSinceLastTarget++;
+        }
+
+        Boolean shouldHostered = isCombatDisabled()
+                || ticksSinceLastTarget >= WEAPON_HOLSTER_DELAY_TICKS;
+
+        if (isWeaponHolstered() != shouldHostered) {
+            setWeaponHolstered(shouldHostered);
+        }
     }
 
     // ========== Condition System ==========
@@ -643,7 +687,8 @@ public class CompanionEntity extends PathfinderMob implements RangedAttackMob {
 
     /**
      * Sets the owner of this companion.
-     * Handles all ownership transitions: null→owner, owner→null, and owner A→owner B.
+     * Handles all ownership transitions: null→owner, owner→null, and owner A→owner
+     * B.
      *
      * @param uuid The owner's UUID, or null to clear ownership
      */
@@ -971,6 +1016,9 @@ public class CompanionEntity extends PathfinderMob implements RangedAttackMob {
                 condition.tick(this);
             }
 
+            // Update weapon holster state based on target presence
+            updateWeaponHolsterState();
+
             // Update position tracking for teleport handler
             if (isInFollowMode() && hasOwner()) {
                 CompanionTeleportHandler.updatePosition(this);
@@ -989,7 +1037,7 @@ public class CompanionEntity extends PathfinderMob implements RangedAttackMob {
 
     @Override
     public void aiStep() {
-        updateSwingTime();  // Required for melee attack animation to work
+        updateSwingTime(); // Required for melee attack animation to work
         super.aiStep();
     }
 

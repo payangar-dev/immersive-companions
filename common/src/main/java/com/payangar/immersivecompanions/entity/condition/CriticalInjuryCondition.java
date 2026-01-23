@@ -78,8 +78,6 @@ public class CriticalInjuryCondition implements CompanionCondition {
     public void onApply(CompanionEntity entity) {
         // Start sneaking when critically injured
         entity.startSneaking();
-        // Holster weapon when critically injured
-        entity.setWeaponHolstered(true);
     }
 
     @Override

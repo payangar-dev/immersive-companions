@@ -1,6 +1,5 @@
 package com.payangar.immersivecompanions.compat.epicfight;
 
-import com.payangar.immersivecompanions.config.ModConfig;
 import com.payangar.immersivecompanions.entity.CompanionEntity;
 import net.minecraft.world.InteractionHand;
 import yesman.epicfight.api.animation.Animator;
@@ -68,6 +67,9 @@ public class CompanionEntityPatch extends HumanoidMobPatch<CompanionEntity> {
             return;
         }
 
+        // Handle weapon holstering when not in combat (Epic Fight uses weapon on back)
+        updateWeaponHolstering();
+
         // Handle crouching state (from any source: critical injury, owner mimic, etc.)
         if (this.original.isCrouching()) {
             if (this.original.walkAnimation.speed() > 0.01F) {
@@ -77,9 +79,6 @@ public class CompanionEntityPatch extends HumanoidMobPatch<CompanionEntity> {
             }
             return;
         }
-
-        // Handle weapon holstering when not in combat (Epic Fight uses weapon on back)
-        updateWeaponHolstering();
 
         // When holstered, use custom basic locomotion that bypasses weapon pose modifications
         // When drawn, use ranged mob motion for aiming/shooting animations
@@ -120,21 +119,17 @@ public class CompanionEntityPatch extends HumanoidMobPatch<CompanionEntity> {
      * When drawn, moves weapons to hands.
      */
     private void updateWeaponHolstering() {
-        if (!ModConfig.get().isEnableWeaponHolstering()) {
-            return;
-        }
-
         if (!(this.getArmature() instanceof ToolHolderArmature toolArmature)) {
             return;
         }
 
-        boolean weaponDrawn = !this.original.isWeaponHolstered();
+        boolean holstered = this.original.isWeaponHolstered();
 
-        if (!weaponDrawn && !isWeaponOnBack()) {
+        if (holstered && !isWeaponOnBack()) {
             // Move weapons to back when holstered
             this.setParentJointOfHand(InteractionHand.MAIN_HAND, toolArmature.backToolJoint());
             this.setParentJointOfHand(InteractionHand.OFF_HAND, toolArmature.backToolJoint());
-        } else if (weaponDrawn && isWeaponOnBack()) {
+        } else if (!holstered && isWeaponOnBack()) {
             // Move weapons to hands when drawn
             this.setParentJointOfHand(InteractionHand.MAIN_HAND, toolArmature.rightToolJoint());
             this.setParentJointOfHand(InteractionHand.OFF_HAND, toolArmature.leftToolJoint());

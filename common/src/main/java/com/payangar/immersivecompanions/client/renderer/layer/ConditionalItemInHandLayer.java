@@ -1,7 +1,6 @@
 package com.payangar.immersivecompanions.client.renderer.layer;
 
 import com.mojang.blaze3d.vertex.PoseStack;
-import com.payangar.immersivecompanions.config.ModConfig;
 import com.payangar.immersivecompanions.entity.CompanionEntity;
 import net.minecraft.client.model.PlayerModel;
 import net.minecraft.client.renderer.ItemInHandRenderer;
@@ -34,13 +33,6 @@ public class ConditionalItemInHandLayer extends ItemInHandLayer<CompanionEntity,
     public void render(PoseStack poseStack, MultiBufferSource buffer, int packedLight,
                        CompanionEntity entity, float limbSwing, float limbSwingAmount,
                        float partialTicks, float ageInTicks, float netHeadYaw, float headPitch) {
-        // If holstering is disabled, always render items in hand normally
-        if (!ModConfig.enableWeaponHolstering) {
-            super.render(poseStack, buffer, packedLight, entity, limbSwing, limbSwingAmount,
-                    partialTicks, ageInTicks, netHeadYaw, headPitch);
-            return;
-        }
-
         // When weapon is drawn (not holstered), render items in hand
         if (!entity.isWeaponHolstered()) {
             super.render(poseStack, buffer, packedLight, entity, limbSwing, limbSwingAmount,

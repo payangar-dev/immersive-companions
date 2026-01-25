@@ -87,6 +87,8 @@ public class CompanionFleeFromAttackerGoal extends Goal {
     @Override
     public void start() {
         this.pathRecalcTimer = 0;
+        // Start sprinting when fleeing (will be blocked if critically injured)
+        companion.startSprinting();
         fleeFromAttacker();
     }
 
@@ -102,6 +104,9 @@ public class CompanionFleeFromAttackerGoal extends Goal {
     public void stop() {
         this.attacker = null;
         companion.getNavigation().stop();
+        if (companion.isSprinting()) {
+            companion.stopSprinting();
+        }
     }
 
     /**

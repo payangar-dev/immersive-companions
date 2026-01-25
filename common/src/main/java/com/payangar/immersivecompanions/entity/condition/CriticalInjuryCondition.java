@@ -64,7 +64,8 @@ public class CriticalInjuryCondition implements CompanionCondition {
         return Set.of(
                 ActionType.SWIM,
                 ActionType.SLEEP,
-                ActionType.JUMP);
+                ActionType.JUMP,
+                ActionType.SPRINT);
     }
 
     @Override

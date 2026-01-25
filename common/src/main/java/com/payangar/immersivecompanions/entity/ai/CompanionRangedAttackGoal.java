@@ -120,6 +120,9 @@ public class CompanionRangedAttackGoal extends Goal {
         chargeTime = 0;
         strafeTime = 0;
         blockedShotTime = 0;
+        if (companion.isSprinting()) {
+            companion.stopSprinting();
+        }
     }
 
     @Override
@@ -149,16 +152,28 @@ public class CompanionRangedAttackGoal extends Goal {
             // Move toward target if too far or can't see
             companion.getNavigation().moveTo(target, speedModifier);
             resetChargingState();
+            // Sprint when approaching target
+            if (!companion.isSprinting()) {
+                companion.startSprinting();
+            }
         } else if (tooClose) {
             // Retreat! Target is too close - move backwards while facing target
             // Set look direction first, then use strafe to move backwards without turning
             companion.getLookControl().setLookAt(target, 30.0F, 30.0F);
             companion.getMoveControl().strafe(-1.0F * (float) speedModifier * 1.2F, 0.0F);
+            // Stop sprinting when retreating
+            if (companion.isSprinting()) {
+                companion.stopSprinting();
+            }
         } else {
             // In optimal range - strafe while attacking
             companion.getNavigation().stop();
             handleStrafing(distSq);
             companion.getLookControl().setLookAt(target, 30.0F, 30.0F);
+            // Stop sprinting when strafing in range
+            if (companion.isSprinting()) {
+                companion.stopSprinting();
+            }
         }
 
         // Handle attack cooldown

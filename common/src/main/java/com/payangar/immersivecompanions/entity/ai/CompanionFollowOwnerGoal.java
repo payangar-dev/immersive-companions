@@ -25,6 +25,11 @@ public class CompanionFollowOwnerGoal extends Goal {
     private static final double TELEPORT_DISTANCE = 32.0;
     private static final int PATH_RECALC_DELAY = 10;
 
+    /** Distance threshold to start sprinting (owner is far) */
+    private static final double SPRINT_START_DISTANCE = 10.0;
+    /** Distance threshold to stop sprinting (caught up with owner) */
+    private static final double SPRINT_STOP_DISTANCE = 7.0;
+
     private final CompanionEntity companion;
     private final double speedModifier;
     private final PathNavigation navigation;
@@ -87,6 +92,9 @@ public class CompanionFollowOwnerGoal extends Goal {
     public void stop() {
         this.owner = null;
         this.navigation.stop();
+        if (companion.isSprinting()) {
+            companion.stopSprinting();
+        }
     }
 
     @Override
@@ -98,12 +106,22 @@ public class CompanionFollowOwnerGoal extends Goal {
         // Look at owner while following
         companion.getLookControl().setLookAt(owner, 10.0F, (float) companion.getMaxHeadXRot());
 
-        double distance = companion.distanceToSqr(owner);
+        double distanceSq = companion.distanceToSqr(owner);
+        double distance = Math.sqrt(distanceSq);
 
         // Teleport if too far away
-        if (distance > TELEPORT_DISTANCE * TELEPORT_DISTANCE) {
+        if (distanceSq > TELEPORT_DISTANCE * TELEPORT_DISTANCE) {
             teleportToOwner();
             return;
+        }
+
+        // Manage sprinting with hysteresis to prevent flickering
+        if (!companion.isSprinting() && distance > SPRINT_START_DISTANCE) {
+            // Start sprinting when owner is far
+            companion.startSprinting();
+        } else if (companion.isSprinting() && distance < SPRINT_STOP_DISTANCE) {
+            // Stop sprinting when caught up
+            companion.stopSprinting();
         }
 
         // Recalculate path periodically

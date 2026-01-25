@@ -1,6 +1,8 @@
 package com.payangar.immersivecompanions.entity.ai;
 
 import com.payangar.immersivecompanions.entity.CompanionEntity;
+
+import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.ai.goal.MeleeAttackGoal;
 
 /**
@@ -8,6 +10,11 @@ import net.minecraft.world.entity.ai.goal.MeleeAttackGoal;
  * when combat is not disabled.
  */
 public class CompanionMeleeAttackGoal extends MeleeAttackGoal {
+
+    /** Squared distance to start sprinting toward target (6 blocks) */
+    private static final double SPRINT_START_DISTANCE_SQ = 36.0;
+    /** Squared distance to stop sprinting (3 blocks, in melee range) */
+    private static final double SPRINT_STOP_DISTANCE_SQ = 9.0;
 
     private final CompanionEntity companion;
 
@@ -48,8 +55,30 @@ public class CompanionMeleeAttackGoal extends MeleeAttackGoal {
     }
 
     @Override
+    public void tick() {
+        super.tick();
+
+        // Manage sprinting based on distance to target
+        LivingEntity target = companion.getTarget();
+        if (target != null && target.isAlive()) {
+            double distanceSq = companion.distanceToSqr(target);
+
+            if (!companion.isSprinting() && distanceSq > SPRINT_START_DISTANCE_SQ) {
+                // Start sprinting when target is far
+                companion.startSprinting();
+            } else if (companion.isSprinting() && distanceSq < SPRINT_STOP_DISTANCE_SQ) {
+                // Stop sprinting when in melee range
+                companion.stopSprinting();
+            }
+        }
+    }
+
+    @Override
     public void stop() {
         super.stop();
         companion.setAggressive(false);
+        if (companion.isSprinting()) {
+            companion.stopSprinting();
+        }
     }
 }

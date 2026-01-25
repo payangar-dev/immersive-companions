@@ -96,6 +96,10 @@ public class CompanionEntity extends PathfinderMob implements RangedAttackMob {
     private static final ResourceLocation SNEAK_SPEED_MODIFIER_ID = ResourceLocation.fromNamespaceAndPath(
             "immersivecompanions", "sneak_speed");
 
+    /** Attribute modifier ID for sprint speed boost */
+    private static final ResourceLocation SPRINT_SPEED_MODIFIER_ID = ResourceLocation.fromNamespaceAndPath(
+            "immersivecompanions", "sprint_speed");
+
     /**
      * Callback for post-ranged-attack events (used by Epic Fight compat for
      * shooting animation)
@@ -673,6 +677,49 @@ public class CompanionEntity extends PathfinderMob implements RangedAttackMob {
         }
     }
 
+    // ========== Sprint State Management ==========
+
+    /**
+     * Checks if this companion can sprint.
+     * Sprinting is blocked when crouching or when a condition blocks the SPRINT action.
+     *
+     * @return true if the companion can sprint
+     */
+    public boolean canSprint() {
+        return !isCrouching() && canPerformAction(ActionType.SPRINT);
+    }
+
+    /**
+     * Starts sprinting for this companion.
+     * Sets the sprint state and applies a speed boost modifier.
+     * Will not sprint if crouching or blocked by a condition.
+     */
+    public void startSprinting() {
+        if (!canSprint()) {
+            return;
+        }
+        this.setSprinting(true);
+
+        AttributeInstance speed = this.getAttribute(Attributes.MOVEMENT_SPEED);
+        if (speed != null && !speed.hasModifier(SPRINT_SPEED_MODIFIER_ID)) {
+            AttributeModifier modifier = new AttributeModifier(
+                    SPRINT_SPEED_MODIFIER_ID, 0.2, AttributeModifier.Operation.ADD_MULTIPLIED_TOTAL);
+            speed.addTransientModifier(modifier);
+        }
+    }
+
+    /**
+     * Stops sprinting for this companion.
+     * Clears the sprint state and removes the speed boost modifier.
+     */
+    public void stopSprinting() {
+        this.setSprinting(false);
+        AttributeInstance speed = this.getAttribute(Attributes.MOVEMENT_SPEED);
+        if (speed != null) {
+            speed.removeModifier(SPRINT_SPEED_MODIFIER_ID);
+        }
+    }
+
     // ========== Owner System ==========
 
     /**
@@ -1014,6 +1061,15 @@ public class CompanionEntity extends PathfinderMob implements RangedAttackMob {
             // Tick active conditions
             for (CompanionCondition condition : activeConditions) {
                 condition.tick(this);
+            }
+
+            if (isSprinting()) {
+                spawnSprintParticle();
+            }
+
+            // Enforce sprint restrictions - stop sprinting if no longer allowed
+            if (isSprinting() && !canSprint()) {
+                stopSprinting();
             }
 
             // Update weapon holster state based on target presence

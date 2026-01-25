@@ -94,9 +94,6 @@ public class CompanionFollowOwnerGoal extends Goal {
         if (companion.isSprinting()) {
             companion.stopSprinting();
         }
-        if (companion.isCrouching() && !companion.isCriticallyInjured()) {
-            companion.stopSneaking();
-        }
     }
 
     @Override
@@ -115,12 +112,6 @@ public class CompanionFollowOwnerGoal extends Goal {
         if (distanceSq > TELEPORT_DISTANCE * TELEPORT_DISTANCE) {
             teleportToOwner();
             return;
-        }
-
-        if (owner.isCrouching() && !companion.isCrouching()) {
-            companion.startSneaking();
-        } else if (!owner.isCrouching() && companion.isCrouching() && !companion.isCriticallyInjured()) {
-            companion.stopSneaking();
         }
 
         // Recalculate path periodically

@@ -689,7 +689,8 @@ public class CompanionEntity extends PathfinderMob implements RangedAttackMob {
 
     /**
      * Checks if this companion can sprint.
-     * Sprinting is blocked when crouching or when a condition blocks the SPRINT action.
+     * Sprinting is blocked when crouching or when a condition blocks the SPRINT
+     * action.
      *
      * @return true if the companion can sprint
      */
@@ -1061,6 +1062,16 @@ public class CompanionEntity extends PathfinderMob implements RangedAttackMob {
             // Enforce sprint restrictions - stop sprinting if no longer allowed
             if (isSprinting() && !canSprint()) {
                 stopSprinting();
+            }
+
+            if (((this.getMode() == CompanionMode.FOLLOW && this.getOwner().isCrouching()) || this.isCriticallyInjured())) {
+                if (!this.isCrouching()) {
+                    startSneaking();
+                }
+            } else {
+                if (this.isCrouching()) {
+                    stopSneaking();
+                }
             }
 
             // Update weapon holster state based on target presence

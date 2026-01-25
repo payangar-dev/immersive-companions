@@ -1,7 +1,6 @@
 package com.payangar.immersivecompanions.entity.condition;
 
 import com.payangar.immersivecompanions.config.ModConfig;
-import com.payangar.immersivecompanions.entity.CompanionEntity;
 
 import java.util.Set;
 
@@ -71,26 +70,5 @@ public class CriticalInjuryCondition implements CompanionCondition {
     @Override
     public boolean disablesCombat() {
         return true;
-    }
-
-    // ========== Lifecycle Hooks ==========
-
-    @Override
-    public void onApply(CompanionEntity entity) {
-        // Start sneaking when critically injured
-        entity.startSneaking();
-    }
-
-    @Override
-    public void onRemove(CompanionEntity entity) {
-        entity.stopSneaking();
-    }
-
-    @Override
-    public void tick(CompanionEntity entity) {
-        // Ensure crouching state is maintained
-        if (!entity.isCrouching()) {
-            entity.startSneaking();
-        }
     }
 }

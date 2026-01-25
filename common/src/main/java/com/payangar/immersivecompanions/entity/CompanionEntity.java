@@ -14,7 +14,6 @@ import com.payangar.immersivecompanions.entity.ai.CompanionFollowOwnerGoal;
 import com.payangar.immersivecompanions.entity.ai.CompanionHurtByTargetGoal;
 import com.payangar.immersivecompanions.entity.ai.CompanionInteractionGoal;
 import com.payangar.immersivecompanions.entity.ai.CompanionMeleeAttackGoal;
-import com.payangar.immersivecompanions.entity.ai.CompanionMimicOwnerGoal;
 import com.payangar.immersivecompanions.entity.ai.CompanionNearestAttackableTargetGoal;
 import com.payangar.immersivecompanions.entity.ai.CompanionRangedAttackGoal;
 import com.payangar.immersivecompanions.entity.ai.CompanionTeamCoordinationGoal;
@@ -227,9 +226,6 @@ public class CompanionEntity extends PathfinderMob implements RangedAttackMob {
 
         // Priority 3: Door interaction (like villagers)
         this.goalSelector.addGoal(3, new OpenDoorGoal(this, true));
-
-        // Priority 4: Mimic owner's sneaking (active in FOLLOW mode)
-        this.goalSelector.addGoal(4, new CompanionMimicOwnerGoal(this));
 
         // Priority 5: Village binding
         this.goalSelector.addGoal(5, new MoveTowardsRestrictionGoal(this, 1.0));
@@ -725,7 +721,7 @@ public class CompanionEntity extends PathfinderMob implements RangedAttackMob {
         AttributeInstance speed = this.getAttribute(Attributes.MOVEMENT_SPEED);
         if (speed != null && !speed.hasModifier(SPRINT_SPEED_MODIFIER_ID)) {
             AttributeModifier modifier = new AttributeModifier(
-                    SPRINT_SPEED_MODIFIER_ID, 0.2, AttributeModifier.Operation.ADD_MULTIPLIED_TOTAL);
+                    SPRINT_SPEED_MODIFIER_ID, 0.1, AttributeModifier.Operation.ADD_MULTIPLIED_TOTAL);
             speed.addTransientModifier(modifier);
         }
     }

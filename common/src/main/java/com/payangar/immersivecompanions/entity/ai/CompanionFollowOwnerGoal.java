@@ -95,6 +95,9 @@ public class CompanionFollowOwnerGoal extends Goal {
         if (companion.isSprinting()) {
             companion.stopSprinting();
         }
+        if (companion.isCrouching() && !companion.isCriticallyInjured()) {
+            companion.stopSneaking();
+        }
     }
 
     @Override
@@ -115,13 +118,10 @@ public class CompanionFollowOwnerGoal extends Goal {
             return;
         }
 
-        // Manage sprinting with hysteresis to prevent flickering
-        if (!companion.isSprinting() && distance > SPRINT_START_DISTANCE) {
-            // Start sprinting when owner is far
-            companion.startSprinting();
-        } else if (companion.isSprinting() && distance < SPRINT_STOP_DISTANCE) {
-            // Stop sprinting when caught up
-            companion.stopSprinting();
+        if (owner.isCrouching() && !companion.isCrouching()) {
+            companion.startSneaking();
+        } else if (!owner.isCrouching() && companion.isCrouching() && !companion.isCriticallyInjured()) {
+            companion.stopSneaking();
         }
 
         // Recalculate path periodically
@@ -130,6 +130,22 @@ public class CompanionFollowOwnerGoal extends Goal {
             if (!companion.isLeashed() && !companion.isPassenger()) {
                 navigation.moveTo(owner, speedModifier);
             }
+        }
+
+        if (distance <=  STOP_DISTANCE || !companion.canSprint()) {
+            if (companion.isSprinting()) {
+                companion.stopSprinting();
+            }
+            return;
+        }
+
+        // Manage sprinting with hysteresis to prevent flickering
+        if (!companion.isSprinting() && (owner.isSprinting() || distance > SPRINT_START_DISTANCE)) {
+            // Start sprinting when owner is far
+            companion.startSprinting();
+        } else if (companion.isSprinting() && distance < SPRINT_STOP_DISTANCE && !owner.isSprinting()) {
+            // Stop sprinting when caught up
+            companion.stopSprinting();
         }
     }
 

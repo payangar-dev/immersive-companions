@@ -160,6 +160,28 @@ public class CompanionEntity extends PathfinderMob implements RangedAttackMob {
         }
     }
 
+    // ========== Despawn Prevention ==========
+
+    /**
+     * Companions should never despawn due to distance from players.
+     * This is the primary despawn prevention - returning false means
+     * the entity will never be removed by the distance-based despawn system.
+     */
+    @Override
+    public boolean removeWhenFarAway(double distanceToClosestPlayer) {
+        return false;
+    }
+
+    /**
+     * Override to completely skip despawn checks.
+     * This is a belt-and-suspenders approach - even if something
+     * bypasses removeWhenFarAway(), this ensures no despawn occurs.
+     */
+    @Override
+    public void checkDespawn() {
+        // Do nothing - companions never despawn
+    }
+
     public static AttributeSupplier.Builder createAttributes() {
         return PathfinderMob.createMobAttributes()
                 .add(Attributes.MAX_HEALTH, 20.0)

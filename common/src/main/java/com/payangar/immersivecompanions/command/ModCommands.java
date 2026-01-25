@@ -1,18 +1,14 @@
 package com.payangar.immersivecompanions.command;
 
 import com.mojang.brigadier.CommandDispatcher;
+import com.payangar.immersivecompanions.entity.CompanionEntity;
 import com.payangar.immersivecompanions.entity.CompanionTeleportHandler;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
-import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
-import net.minecraft.resources.ResourceKey;
-import net.minecraft.server.MinecraftServer;
-import net.minecraft.world.level.Level;
+import net.minecraft.server.level.ServerPlayer;
 
 import java.util.List;
-import java.util.Map;
-import java.util.UUID;
 
 /**
  * Debug commands for Immersive Companions mod.
@@ -23,71 +19,47 @@ public class ModCommands {
         dispatcher.register(
                 Commands.literal("immersivecompanions")
                         .requires(source -> source.hasPermission(2))
-                        .then(Commands.literal("registry")
-                                .then(Commands.literal("list")
-                                        .executes(context -> listRegistry(context.getSource()))
+                        .then(Commands.literal("companions")
+                                .then(Commands.literal("nearby")
+                                        .executes(context -> listNearbyCompanions(context.getSource()))
                                 )
                         )
         );
     }
 
-    private static int listRegistry(CommandSourceStack source) {
-        Map<UUID, List<CompanionTeleportHandler.TrackedCompanionInfo>> snapshot =
-                CompanionTeleportHandler.getRegistrySnapshot();
+    private static int listNearbyCompanions(CommandSourceStack source) {
+        if (!(source.getEntity() instanceof ServerPlayer player)) {
+            source.sendFailure(Component.literal("This command must be run by a player"));
+            return 0;
+        }
 
-        if (snapshot.isEmpty()) {
-            source.sendSuccess(() -> Component.literal("=== Companion Teleport Registry ==="), false);
-            source.sendSuccess(() -> Component.literal("No companions currently tracked."), false);
+        List<CompanionEntity> companions = CompanionTeleportHandler.getCompanionsForTeleport(player);
+
+        source.sendSuccess(() -> Component.literal("=== Nearby Companions (Teleport-Ready) ==="), false);
+
+        if (companions.isEmpty()) {
+            source.sendSuccess(() -> Component.literal("No companions nearby that would teleport with you."), false);
+            source.sendSuccess(() -> Component.literal("(Must be within 16 blocks, in FOLLOW mode, and owned by you)"), false);
             return 1;
         }
 
-        MinecraftServer server = source.getServer();
-        int totalCompanions = 0;
-        int totalPlayers = 0;
+        for (CompanionEntity companion : companions) {
+            String name = companion.getDisplayName().getString();
+            String mode = companion.getMode().getId();
+            boolean injured = companion.isCriticallyInjured();
+            double distance = companion.distanceTo(player);
 
-        source.sendSuccess(() -> Component.literal("=== Companion Teleport Registry ==="), false);
-
-        for (Map.Entry<UUID, List<CompanionTeleportHandler.TrackedCompanionInfo>> entry : snapshot.entrySet()) {
-            UUID playerUuid = entry.getKey();
-            List<CompanionTeleportHandler.TrackedCompanionInfo> companions = entry.getValue();
-
-            // Try to get player name
-            String playerName = getPlayerName(server, playerUuid);
-            source.sendSuccess(() -> Component.literal("Player: " + playerName), false);
-
-            for (CompanionTeleportHandler.TrackedCompanionInfo info : companions) {
-                String companionIdShort = info.companionId().toString().substring(0, 8);
-                String dimension = formatDimension(info.dimension());
-                BlockPos pos = info.lastPos();
-
-                source.sendSuccess(() -> Component.literal(
-                        "  - Companion: " + companionIdShort + " | " + dimension +
-                                " | [" + pos.getX() + ", " + pos.getY() + ", " + pos.getZ() + "]"
-                ), false);
-                totalCompanions++;
-            }
-            totalPlayers++;
+            source.sendSuccess(() -> Component.literal(String.format(
+                    "  - %s | %s | %.1f blocks%s",
+                    name, mode, distance, injured ? " [INJURED]" : ""
+            )), false);
         }
 
-        int finalTotalCompanions = totalCompanions;
-        int finalTotalPlayers = totalPlayers;
+        int count = companions.size();
         source.sendSuccess(() -> Component.literal(
-                "Total: " + finalTotalCompanions + " companions tracked for " + finalTotalPlayers + " players"
+                "Total: " + count + " companion(s) would teleport with you"
         ), false);
 
         return 1;
-    }
-
-    private static String getPlayerName(MinecraftServer server, UUID playerUuid) {
-        var player = server.getPlayerList().getPlayer(playerUuid);
-        if (player != null) {
-            return player.getName().getString();
-        }
-        // Player offline - show shortened UUID
-        return playerUuid.toString().substring(0, 8) + "...";
-    }
-
-    private static String formatDimension(ResourceKey<Level> dimension) {
-        return dimension.location().toString();
     }
 }

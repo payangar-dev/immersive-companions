@@ -65,6 +65,22 @@ public class ImmersiveCompanionsFabric implements ModInitializer {
             }
         });
 
+        // Initialize Waystones compatibility if present
+        // Uses isolated class loading to prevent NoClassDefFoundError when Waystones is absent
+        if (Services.get().isModLoaded("waystones")) {
+            initWaystonesCompat();
+        }
+
         ImmersiveCompanions.init();
+    }
+
+    /**
+     * Isolated method to initialize Waystones compatibility.
+     * This method references WaystonesCompatFabric which will only be loaded
+     * when this method is called, preventing class loading errors when
+     * Waystones is not installed.
+     */
+    private void initWaystonesCompat() {
+        com.payangar.immersivecompanions.compat.waystones.WaystonesCompatFabric.init();
     }
 }

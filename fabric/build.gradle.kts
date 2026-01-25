@@ -28,6 +28,10 @@ repositories {
         name = "YACL"
         url = uri("https://maven.isxander.dev/releases")
     }
+    maven {
+        name = "Modrinth"
+        url = uri("https://api.modrinth.com/maven")
+    }
 }
 
 dependencies {
@@ -43,6 +47,10 @@ dependencies {
     // Config GUI
     modImplementation("dev.isxander:yet-another-config-lib:${yacl_version}-fabric")
     modImplementation("com.terraformersmc:modmenu:${modmenu_version}")
+
+    // Waystones compatibility (compile-only soft dependency)
+    modCompileOnly("maven.modrinth:waystones:21.1.4+fabric-1.21.1")
+    modCompileOnly("maven.modrinth:balm:21.0.21+fabric-1.21.1")
 
     implementation(project(":common"))
 }

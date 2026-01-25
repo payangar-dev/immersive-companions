@@ -39,6 +39,12 @@ public class ImmersiveCompanionsNeoForge {
             initEpicFightCompat(modEventBus);
         }
 
+        // Initialize Waystones compatibility if present
+        // Uses isolated class loading to prevent NoClassDefFoundError when Waystones is absent
+        if (ModList.get().isLoaded("waystones")) {
+            initWaystonesCompat();
+        }
+
         ImmersiveCompanions.init();
     }
 
@@ -50,5 +56,15 @@ public class ImmersiveCompanionsNeoForge {
      */
     private void initEpicFightCompat(IEventBus modEventBus) {
         EpicFightCompat.init(modEventBus);
+    }
+
+    /**
+     * Isolated method to initialize Waystones compatibility.
+     * This method references WaystonesCompatNeoForge which will only be loaded
+     * when this method is called, preventing class loading errors when
+     * Waystones is not installed.
+     */
+    private void initWaystonesCompat() {
+        com.payangar.immersivecompanions.compat.waystones.WaystonesCompatNeoForge.init();
     }
 }

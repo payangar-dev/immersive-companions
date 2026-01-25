@@ -426,18 +426,8 @@ public class CompanionEntity extends PathfinderMob implements RangedAttackMob {
             return;
         }
 
-        Boolean needUnregister = this.currentMode == CompanionMode.FOLLOW;
         this.currentMode = mode;
         this.entityData.set(DATA_MODE_ID, mode.getId());
-
-        // Handle teleport handler registration
-        if (!this.level().isClientSide) {
-            if (mode == CompanionMode.FOLLOW && hasOwner()) {
-                CompanionTeleportHandler.register(this);
-            } else if (needUnregister) {
-                CompanionTeleportHandler.unregister(this);
-            }
-        }
     }
 
     // ========== Combat Stance System ==========
@@ -758,19 +748,7 @@ public class CompanionEntity extends PathfinderMob implements RangedAttackMob {
      * @param uuid The owner's UUID, or null to clear ownership
      */
     public void setOwnerUUID(@Nullable UUID uuid) {
-        UUID oldOwner = this.ownerUUID;
         this.ownerUUID = uuid;
-
-        if (!this.level().isClientSide && isInFollowMode()) {
-            // Unregister from old owner first (if any)
-            if (oldOwner != null) {
-                CompanionTeleportHandler.unregister(this.getUUID(), oldOwner);
-            }
-            // Register to new owner (if any)
-            if (uuid != null) {
-                CompanionTeleportHandler.register(this);
-            }
-        }
     }
 
     /**
@@ -944,11 +922,6 @@ public class CompanionEntity extends PathfinderMob implements RangedAttackMob {
         if (tag.contains("WeaponHolstered")) {
             setWeaponHolstered(tag.getBoolean("WeaponHolstered"));
         }
-
-        // Register with teleport handler if in FOLLOW mode with an owner
-        if (!this.level().isClientSide && hasOwner() && isInFollowMode()) {
-            CompanionTeleportHandler.register(this);
-        }
     }
 
     /**
@@ -1092,11 +1065,6 @@ public class CompanionEntity extends PathfinderMob implements RangedAttackMob {
 
             // Update weapon holster state based on target presence
             updateWeaponHolsterState();
-
-            // Update position tracking for teleport handler
-            if (isInFollowMode() && hasOwner()) {
-                CompanionTeleportHandler.updatePosition(this);
-            }
         }
     }
 
@@ -1117,11 +1085,6 @@ public class CompanionEntity extends PathfinderMob implements RangedAttackMob {
 
     @Override
     public void remove(RemovalReason reason) {
-        // Unregister from teleport handler before removal
-        // Use explicit IDs in case entity state is modified during removal
-        if (!this.level().isClientSide && this.ownerUUID != null) {
-            CompanionTeleportHandler.unregister(this.getUUID(), this.ownerUUID);
-        }
         super.remove(reason);
     }
 

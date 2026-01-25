@@ -2,15 +2,14 @@ package com.payangar.immersivecompanions.entity.ai;
 
 import com.payangar.immersivecompanions.entity.CompanionEntity;
 import com.payangar.immersivecompanions.entity.mode.CompanionMode;
+import com.payangar.immersivecompanions.entity.teleport.SafePositionFinder;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.ai.goal.Goal;
 import net.minecraft.world.entity.ai.navigation.PathNavigation;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.level.Level;
-import net.minecraft.world.level.block.state.BlockState;
 
-import javax.annotation.Nullable;
 import java.util.EnumSet;
 
 /**
@@ -152,71 +151,15 @@ public class CompanionFollowOwnerGoal extends Goal {
     private void teleportToOwner() {
         BlockPos ownerPos = owner.blockPosition();
 
-        // Try to find a safe teleport position nearby with larger search radius
-        for (int attempt = 0; attempt < 20; attempt++) {
-            int dx = randomOffset(5);
-            int dy = randomOffset(2); // Vertical variance for terrain handling
-            int dz = randomOffset(5);
-            BlockPos testPos = ownerPos.offset(dx, dy, dz);
+        // Use SafePositionFinder with extended search parameters
+        BlockPos safePos = SafePositionFinder.findSafePositionExtended(
+                level, ownerPos, companion.getType(), 5, 2, 20);
 
-            // Search vertically to find ground level
-            BlockPos validPos = findValidTeleportPosition(testPos);
-            if (validPos != null) {
-                companion.moveTo(validPos.getX() + 0.5, validPos.getY(), validPos.getZ() + 0.5,
-                        companion.getYRot(), companion.getXRot());
-                navigation.stop();
-                return;
-            }
+        if (safePos != null) {
+            companion.moveTo(safePos.getX() + 0.5, safePos.getY(), safePos.getZ() + 0.5,
+                    companion.getYRot(), companion.getXRot());
+            navigation.stop();
         }
-    }
-
-    /**
-     * Searches vertically from the given position to find a valid teleport spot.
-     * Checks 4 blocks up and down from the initial position.
-     */
-    @Nullable
-    private BlockPos findValidTeleportPosition(BlockPos pos) {
-        // Check at the given position first
-        if (canTeleportTo(pos)) {
-            return pos;
-        }
-
-        // Search up and down from the initial position
-        for (int yOffset = 1; yOffset <= 4; yOffset++) {
-            BlockPos above = pos.above(yOffset);
-            if (canTeleportTo(above)) {
-                return above;
-            }
-            BlockPos below = pos.below(yOffset);
-            if (canTeleportTo(below)) {
-                return below;
-            }
-        }
-
-        return null;
-    }
-
-    private int randomOffset(int range) {
-        return companion.getRandom().nextInt(range * 2 + 1) - range;
-    }
-
-    private boolean canTeleportTo(BlockPos pos) {
-        BlockState groundState = level.getBlockState(pos.below());
-        if (!groundState.isValidSpawn(level, pos.below(), companion.getType())) {
-            return false;
-        }
-
-        // Check that the space is not blocked (needs 2 blocks of air above ground)
-        BlockPos.MutableBlockPos mutablePos = pos.mutable();
-        for (int y = 0; y < 2; y++) {
-            BlockState state = level.getBlockState(mutablePos);
-            if (state.blocksMotion()) {
-                return false;
-            }
-            mutablePos.move(0, 1, 0);
-        }
-
-        return true;
     }
 
     private Player getOwner() {

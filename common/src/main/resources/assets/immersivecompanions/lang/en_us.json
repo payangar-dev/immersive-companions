@@ -27,6 +27,24 @@
     "chat.immersivecompanions.recruited.11": "<%s> I swear to protect you. On my honor.",
     "chat.immersivecompanions.recruited.12": "<%s> Good. I was getting bored guarding this village anyway.",
 
+    "chat.immersivecompanions.hurt_by_ally.1": "<%s> We're supposed to be allies!",
+    "chat.immersivecompanions.hurt_by_ally.2": "<%s> Why are you attacking me?!",
+    "chat.immersivecompanions.hurt_by_ally.3": "<%s> What did I do wrong?!",
+    "chat.immersivecompanions.hurt_by_ally.4": "<%s> I thought we were on the same side!",
+    "chat.immersivecompanions.hurt_by_ally.5": "<%s> Please, I'm your companion!",
+
+    "chat.immersivecompanions.hurt_by_enemy_player.1": "<%s> I surrender!",
+    "chat.immersivecompanions.hurt_by_enemy_player.2": "<%s> Stop, please! I'm retreating!",
+    "chat.immersivecompanions.hurt_by_enemy_player.3": "<%s> I yield! No more!",
+    "chat.immersivecompanions.hurt_by_enemy_player.4": "<%s> I'm backing off! Don't hurt me!",
+    "chat.immersivecompanions.hurt_by_enemy_player.5": "<%s> Mercy! I won't fight back!",
+
+    "chat.immersivecompanions.hurt_by_mob.1": "<%s> Help! I'm under attack!",
+    "chat.immersivecompanions.hurt_by_mob.2": "<%s> A little assistance here?!",
+    "chat.immersivecompanions.hurt_by_mob.3": "<%s> I could use some backup!",
+    "chat.immersivecompanions.hurt_by_mob.4": "<%s> They're hitting hard! Help me!",
+    "chat.immersivecompanions.hurt_by_mob.5": "<%s> I'm in trouble here!",
+
     "stance.immersivecompanions.passive": "Passive",
     "stance.immersivecompanions.passive.desc": "Never attacks. Flees when threatened.",
     "stance.immersivecompanions.defensive": "Defensive",

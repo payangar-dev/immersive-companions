@@ -1148,6 +1148,16 @@ public class CompanionEntity extends PathfinderMob implements RangedAttackMob {
     }
 
     @Override
+    public int getMaxFallDistance() {
+        // Critically injured companions are more cautious about falls
+        if (isCriticallyInjured()) {
+            return 1;
+        }
+        // Normal companions avoid damage-causing falls (>3 blocks)
+        return 3;
+    }
+
+    @Override
     public void aiStep() {
         updateSwingTime(); // Required for melee attack animation to work
         super.aiStep();

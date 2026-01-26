@@ -24,9 +24,13 @@ import com.payangar.immersivecompanions.entity.condition.ActionType;
 import com.payangar.immersivecompanions.entity.condition.CompanionCondition;
 import com.payangar.immersivecompanions.entity.condition.CriticalInjuryCondition;
 import com.payangar.immersivecompanions.entity.mode.CompanionMode;
+import com.payangar.immersivecompanions.inventory.CompanionEquipmentMenu;
 import com.payangar.immersivecompanions.network.ModNetworking;
+import com.payangar.immersivecompanions.platform.Services;
 import com.payangar.immersivecompanions.recruitment.CompanionPricing;
 import net.minecraft.nbt.CompoundTag;
+import net.minecraft.nbt.ListTag;
+import net.minecraft.nbt.Tag;
 import net.minecraft.network.syncher.EntityDataAccessor;
 import net.minecraft.network.syncher.EntityDataSerializers;
 import net.minecraft.network.syncher.SynchedEntityData;
@@ -52,6 +56,8 @@ import net.minecraft.world.item.BowItem;
 import net.minecraft.world.item.CrossbowItem;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
+import net.minecraft.world.inventory.AbstractContainerMenu;
+import net.minecraft.world.MenuProvider;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.ServerLevelAccessor;
 import net.minecraft.world.entity.ai.navigation.PathNavigation;
@@ -885,6 +891,28 @@ public class CompanionEntity extends PathfinderMob implements RangedAttackMob {
         if (ownerUUID != null) {
             tag.putUUID("OwnerUUID", ownerUUID);
         }
+
+        // Save armor equipment explicitly
+        ListTag armorItems = new ListTag();
+        for (ItemStack stack : this.getArmorSlots()) {
+            if (stack.isEmpty()) {
+                armorItems.add(new CompoundTag());
+            } else {
+                armorItems.add(stack.save(this.registryAccess()));
+            }
+        }
+        tag.put("CompanionArmor", armorItems);
+
+        // Save hand items explicitly
+        ListTag handItems = new ListTag();
+        for (ItemStack stack : this.getHandSlots()) {
+            if (stack.isEmpty()) {
+                handItems.add(new CompoundTag());
+            } else {
+                handItems.add(stack.save(this.registryAccess()));
+            }
+        }
+        tag.put("CompanionHands", handItems);
     }
 
     @Override
@@ -925,6 +953,34 @@ public class CompanionEntity extends PathfinderMob implements RangedAttackMob {
         }
         if (tag.contains("WeaponHolstered")) {
             setWeaponHolstered(tag.getBoolean("WeaponHolstered"));
+        }
+
+        // Load armor equipment
+        if (tag.contains("CompanionArmor", Tag.TAG_LIST)) {
+            ListTag armorItems = tag.getList("CompanionArmor", Tag.TAG_COMPOUND);
+            EquipmentSlot[] armorSlots = {EquipmentSlot.FEET, EquipmentSlot.LEGS, EquipmentSlot.CHEST, EquipmentSlot.HEAD};
+            for (int i = 0; i < Math.min(armorItems.size(), armorSlots.length); i++) {
+                CompoundTag itemTag = armorItems.getCompound(i);
+                if (!itemTag.isEmpty()) {
+                    final EquipmentSlot slot = armorSlots[i];
+                    ItemStack.parse(this.registryAccess(), itemTag).ifPresent(
+                            stack -> this.setItemSlot(slot, stack));
+                }
+            }
+        }
+
+        // Load hand items
+        if (tag.contains("CompanionHands", Tag.TAG_LIST)) {
+            ListTag handItems = tag.getList("CompanionHands", Tag.TAG_COMPOUND);
+            EquipmentSlot[] handSlots = {EquipmentSlot.MAINHAND, EquipmentSlot.OFFHAND};
+            for (int i = 0; i < Math.min(handItems.size(), handSlots.length); i++) {
+                CompoundTag itemTag = handItems.getCompound(i);
+                if (!itemTag.isEmpty()) {
+                    final EquipmentSlot slot = handSlots[i];
+                    ItemStack.parse(this.registryAccess(), itemTag).ifPresent(
+                            stack -> this.setItemSlot(slot, stack));
+                }
+            }
         }
     }
 
@@ -1115,10 +1171,12 @@ public class CompanionEntity extends PathfinderMob implements RangedAttackMob {
             return super.mobInteract(player, hand);
         }
 
-        // Skip recruitment for owned companions (future: mode cycling GUI)
+        // Open equipment screen for owners
         if (hasOwner()) {
-            // TODO: Open mode cycling GUI for owner
-            return super.mobInteract(player, hand);
+            if (isOwnedBy(player) && !this.level().isClientSide) {
+                openEquipmentScreen(player);
+            }
+            return InteractionResult.sidedSuccess(this.level().isClientSide);
         }
 
         // Only show recruitment screen for companions in the default team
@@ -1143,5 +1201,26 @@ public class CompanionEntity extends PathfinderMob implements RangedAttackMob {
             ModNetworking.get().sendOpenRecruitmentScreen(serverPlayer, this.getId(), basePrice, finalPrice);
         }
         return InteractionResult.sidedSuccess(this.level().isClientSide);
+    }
+
+    /**
+     * Opens the equipment screen for the owner player.
+     * Uses the vanilla container system with extra data for entity ID.
+     */
+    private void openEquipmentScreen(Player player) {
+        if (player instanceof net.minecraft.server.level.ServerPlayer serverPlayer) {
+            final CompanionEntity companion = this;
+            Services.get().openMenu(serverPlayer, new MenuProvider() {
+                @Override
+                public net.minecraft.network.chat.Component getDisplayName() {
+                    return companion.getDisplayName();
+                }
+
+                @Override
+                public AbstractContainerMenu createMenu(int containerId, net.minecraft.world.entity.player.Inventory playerInventory, Player player) {
+                    return new CompanionEquipmentMenu(containerId, playerInventory, companion);
+                }
+            }, buf -> buf.writeVarInt(this.getId()));
+        }
     }
 }

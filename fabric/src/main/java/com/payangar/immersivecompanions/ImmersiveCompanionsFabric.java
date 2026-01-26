@@ -9,6 +9,7 @@ import com.payangar.immersivecompanions.network.FabricNetworking;
 import com.payangar.immersivecompanions.platform.FabricServices;
 import com.payangar.immersivecompanions.platform.Services;
 import com.payangar.immersivecompanions.registry.FabricEntityRegistration;
+import com.payangar.immersivecompanions.registry.FabricMenuRegistration;
 import com.payangar.immersivecompanions.spawning.CompanionSpawnLogic;
 import net.fabricmc.api.ModInitializer;
 import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
@@ -27,6 +28,9 @@ public class ImmersiveCompanionsFabric implements ModInitializer {
 
         // Register entities
         FabricEntityRegistration.register();
+
+        // Register menu types
+        FabricMenuRegistration.register();
 
         // Register networking payloads
         FabricNetworking.registerPayloads();

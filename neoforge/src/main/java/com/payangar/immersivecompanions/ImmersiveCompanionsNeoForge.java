@@ -6,6 +6,7 @@ import com.payangar.immersivecompanions.network.NeoForgeNetworking;
 import com.payangar.immersivecompanions.platform.NeoForgeServices;
 import com.payangar.immersivecompanions.platform.Services;
 import com.payangar.immersivecompanions.registry.NeoForgeEntityRegistration;
+import com.payangar.immersivecompanions.registry.NeoForgeMenuRegistration;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.fml.ModList;
@@ -21,6 +22,9 @@ public class ImmersiveCompanionsNeoForge {
 
         // Register entities
         NeoForgeEntityRegistration.register(modEventBus);
+
+        // Register menu types
+        NeoForgeMenuRegistration.register(modEventBus);
 
         // Register networking
         NeoForgeNetworking.register(modEventBus);

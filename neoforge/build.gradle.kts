@@ -76,6 +76,9 @@ dependencies {
     compileOnly("maven.modrinth:waystones:21.1.4+neoforge-1.21.1")
     compileOnly("maven.modrinth:balm:21.0.21+neoforge-1.21.1")
 
+    // Dynamic Lights compatibility (compile-only soft dependency)
+    compileOnly("maven.modrinth:sodium-dynamic-lights:neoforge-1.21.1-1.0.10")
+
     "vscode"("maven.modrinth:epic-fight:21.14.4-mc1.21.1-neoforge")
     "vscode"("maven.modrinth:waystones:21.1.4+neoforge-1.21.1")
     "vscode"("maven.modrinth:balm:21.0.21+neoforge-1.21.1")

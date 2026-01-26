@@ -12,6 +12,7 @@ import net.neoforged.bus.api.IEventBus;
 import net.neoforged.fml.ModList;
 import net.neoforged.fml.ModLoadingContext;
 import net.neoforged.fml.common.Mod;
+import net.neoforged.fml.event.lifecycle.FMLClientSetupEvent;
 import net.neoforged.fml.loading.FMLLoader;
 import net.neoforged.neoforge.client.gui.IConfigScreenFactory;
 
@@ -29,12 +30,13 @@ public class ImmersiveCompanionsNeoForge {
         // Register networking
         NeoForgeNetworking.register(modEventBus);
 
-        // Register config screen (client-side only)
+        // Register config screen and client setup (client-side only)
         if (FMLLoader.getDist() == Dist.CLIENT) {
             ModLoadingContext.get().registerExtensionPoint(
                     IConfigScreenFactory.class,
                     () -> (modContainer, parent) -> ConfigScreenFactory.createConfigScreen(parent)
             );
+            modEventBus.addListener(this::clientSetup);
         }
 
         // Initialize Epic Fight compatibility if present
@@ -70,5 +72,28 @@ public class ImmersiveCompanionsNeoForge {
      */
     private void initWaystonesCompat() {
         com.payangar.immersivecompanions.compat.waystones.WaystonesCompatNeoForge.init();
+    }
+
+    /**
+     * Client setup event handler.
+     * Initializes client-side mod compatibility.
+     */
+    private void clientSetup(FMLClientSetupEvent event) {
+        // Initialize Dynamic Lights compatibility if SodiumDynamicLights is present
+        // Unlike Fabric, NeoForge doesn't have entrypoint discovery for dynamic lights,
+        // so we must call the API directly during client initialization.
+        if (ModList.get().isLoaded("sodiumdynamiclights")) {
+            initDynamicLightsCompat();
+        }
+    }
+
+    /**
+     * Isolated method to initialize Dynamic Lights compatibility.
+     * This method references DynamicLightsCompatNeoForge which will only be loaded
+     * when this method is called, preventing class loading errors when
+     * SodiumDynamicLights is not installed.
+     */
+    private void initDynamicLightsCompat() {
+        com.payangar.immersivecompanions.compat.dynamiclights.DynamicLightsCompatNeoForge.init();
     }
 }

@@ -52,6 +52,9 @@ dependencies {
     modCompileOnly("maven.modrinth:waystones:21.1.4+fabric-1.21.1")
     modCompileOnly("maven.modrinth:balm:21.0.21+fabric-1.21.1")
 
+    // Dynamic Lights compatibility (compile-only soft dependency)
+    modCompileOnly("maven.modrinth:sodium-dynamic-lights:fabric-1.21.1-1.0.10")
+
     implementation(project(":common"))
 }
 

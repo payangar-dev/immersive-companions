@@ -18,6 +18,7 @@ import com.payangar.immersivecompanions.entity.ai.CompanionNearestAttackableTarg
 import com.payangar.immersivecompanions.entity.ai.CompanionRangedAttackGoal;
 import com.payangar.immersivecompanions.entity.ai.CompanionTeamCoordinationGoal;
 import com.payangar.immersivecompanions.entity.ai.CompanionWaterAvoidingRandomStrollGoal;
+import com.payangar.immersivecompanions.entity.ai.pathfinding.CompanionGroundPathNavigation;
 import com.payangar.immersivecompanions.entity.combat.CombatStance;
 import com.payangar.immersivecompanions.entity.condition.ActionType;
 import com.payangar.immersivecompanions.entity.condition.CompanionCondition;
@@ -53,7 +54,7 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.ServerLevelAccessor;
-import net.minecraft.world.entity.ai.navigation.GroundPathNavigation;
+import net.minecraft.world.entity.ai.navigation.PathNavigation;
 import net.minecraft.world.phys.AABB;
 
 import javax.annotation.Nullable;
@@ -151,12 +152,14 @@ public class CompanionEntity extends PathfinderMob implements RangedAttackMob {
     public CompanionEntity(EntityType<? extends CompanionEntity> entityType, Level level) {
         super(entityType, level);
         setPersistenceRequired();
+    }
 
-        // Enable door opening in pathfinding
-        if (this.getNavigation() instanceof GroundPathNavigation groundNav) {
-            groundNav.setCanOpenDoors(true);
-            groundNav.setCanPassDoors(true);
-        }
+    @Override
+    protected PathNavigation createNavigation(Level level) {
+        CompanionGroundPathNavigation navigation = new CompanionGroundPathNavigation(this, level);
+        navigation.setCanOpenDoors(true);
+        navigation.setCanPassDoors(true);
+        return navigation;
     }
 
     // ========== Despawn Prevention ==========

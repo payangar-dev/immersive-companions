@@ -18,6 +18,7 @@ import com.payangar.immersivecompanions.entity.ai.CompanionNearestAttackableTarg
 import com.payangar.immersivecompanions.entity.ai.CompanionRangedAttackGoal;
 import com.payangar.immersivecompanions.entity.ai.CompanionTeamCoordinationGoal;
 import com.payangar.immersivecompanions.entity.ai.CompanionWaterAvoidingRandomStrollGoal;
+import com.payangar.immersivecompanions.entity.ai.GapJumpHelper;
 import com.payangar.immersivecompanions.entity.ai.pathfinding.CompanionGroundPathNavigation;
 import com.payangar.immersivecompanions.entity.combat.CombatStance;
 import com.payangar.immersivecompanions.entity.condition.ActionType;
@@ -139,6 +140,15 @@ public class CompanionEntity extends PathfinderMob implements RangedAttackMob {
      * Used for delayed weapon holstering. Server-side only, not persisted.
      */
     private int ticksSinceLastTarget = Integer.MAX_VALUE;
+
+    /**
+     * Cooldown in ticks before another gap jump can be attempted.
+     * Prevents rapid re-attempts when approaching gaps.
+     */
+    private int gapJumpCooldown = 0;
+
+    /** Cooldown duration in ticks after a gap jump attempt (10 ticks = 0.5 seconds) */
+    private static final int GAP_JUMP_COOLDOWN_TICKS = 10;
 
     /** UUID of the player who owns this companion (null if unbought) */
     @Nullable
@@ -590,6 +600,28 @@ public class CompanionEntity extends PathfinderMob implements RangedAttackMob {
 
         if (isWeaponHolstered() != shouldHostered) {
             setWeaponHolstered(shouldHostered);
+        }
+    }
+
+    // ========== Gap Jump System ==========
+
+    /**
+     * Attempts to detect and jump over a gap ahead of the companion.
+     * Only called when sprinting and on ground, with no active cooldown.
+     */
+    private void attemptGapJump() {
+        // Check if we're near a gap edge
+        if (!GapJumpHelper.isNearGapEdge(this)) {
+            return;
+        }
+
+        // Detect the full gap
+        GapJumpHelper.GapInfo gap = GapJumpHelper.detectGapAhead(this);
+
+        // Check if we should jump
+        if (GapJumpHelper.shouldJump(this, gap)) {
+            GapJumpHelper.performGapJump(this, gap);
+            gapJumpCooldown = GAP_JUMP_COOLDOWN_TICKS;
         }
     }
 
@@ -1116,6 +1148,13 @@ public class CompanionEntity extends PathfinderMob implements RangedAttackMob {
 
             if (isSprinting()) {
                 spawnSprintParticle();
+            }
+
+            // Gap-jump detection and execution
+            if (gapJumpCooldown > 0) {
+                gapJumpCooldown--;
+            } else if (isSprinting() && onGround()) {
+                attemptGapJump();
             }
 
             // Enforce sprint restrictions - stop sprinting if no longer allowed

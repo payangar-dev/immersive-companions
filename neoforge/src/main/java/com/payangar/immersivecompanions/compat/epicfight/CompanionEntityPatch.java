@@ -4,6 +4,7 @@ import com.payangar.immersivecompanions.entity.CompanionEntity;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.item.CrossbowItem;
 import net.minecraft.world.item.UseAnim;
+import net.neoforged.neoforge.event.tick.EntityTickEvent;
 import yesman.epicfight.api.animation.Animator;
 import yesman.epicfight.api.animation.LivingMotions;
 import yesman.epicfight.api.animation.types.StaticAnimation;
@@ -13,6 +14,7 @@ import yesman.epicfight.gameasset.Animations;
 import yesman.epicfight.model.armature.types.ToolHolderArmature;
 import yesman.epicfight.world.capabilities.entitypatch.Factions;
 import yesman.epicfight.world.capabilities.entitypatch.HumanoidMobPatch;
+import yesman.epicfight.world.capabilities.item.CapabilityItem;
 import yesman.epicfight.world.entity.ai.goal.AnimatedAttackGoal;
 import yesman.epicfight.world.entity.ai.goal.CombatBehaviors;
 import yesman.epicfight.world.entity.ai.goal.TargetChasingGoal;
@@ -27,6 +29,11 @@ import yesman.epicfight.world.entity.ai.goal.TargetChasingGoal;
  * system.
  */
 public class CompanionEntityPatch extends HumanoidMobPatch<CompanionEntity> {
+
+    /**
+     * Tracks the previous holster state to detect changes and update animations.
+     */
+    private boolean wasHolstered = true;
 
     public CompanionEntityPatch(CompanionEntity original) {
         super(original, Factions.VILLAGER); // Allies with villagers, hostile to undead
@@ -51,6 +58,28 @@ public class CompanionEntityPatch extends HumanoidMobPatch<CompanionEntity> {
 
         // Note: Ranged animations (AIM, SHOT, RELOAD) come from weapon capabilities
         // via modifyLivingMotionByCurrentItem() inherited from HumanoidMobPatch
+    }
+
+    @Override
+    public void preTick(EntityTickEvent.Pre event) {
+        super.preTick(event);
+
+        // Server-side: detect holster state changes and update animations/AI
+        if (!this.isLogicalClient()) {
+            boolean holstered = this.original.isWeaponHolstered();
+
+            if (holstered != wasHolstered) {
+                wasHolstered = holstered;
+
+                // Update locomotion animations (bow AIM, crossbow RELOAD, etc.)
+                this.modifyLivingMotionByCurrentItem(false);
+
+                // Rebuild combat AI when unholstering (for melee weapon attack animations)
+                if (!holstered) {
+                    this.initAI();
+                }
+            }
+        }
     }
 
     @Override
@@ -120,6 +149,7 @@ public class CompanionEntityPatch extends HumanoidMobPatch<CompanionEntity> {
      * Updates weapon positioning based on holster state.
      * When holstered, moves weapons to the back.
      * When drawn, moves weapons to hands.
+     * Animation and AI updates are handled by preTick().
      */
     private void updateWeaponHolstering() {
         if (!(this.getArmature() instanceof ToolHolderArmature toolArmature)) {
@@ -137,6 +167,19 @@ public class CompanionEntityPatch extends HumanoidMobPatch<CompanionEntity> {
             this.setParentJointOfHand(InteractionHand.MAIN_HAND, toolArmature.rightToolJoint());
             this.setParentJointOfHand(InteractionHand.OFF_HAND, toolArmature.leftToolJoint());
         }
+    }
+
+    /**
+     * Returns the item capability for the held item.
+     * When the weapon is holstered (on back), returns EMPTY capability
+     * so Epic Fight uses unarmed animations instead of weapon-holding animations.
+     */
+    @Override
+    public CapabilityItem getHoldingItemCapability(InteractionHand hand) {
+        if (this.original.isWeaponHolstered()) {
+            return CapabilityItem.EMPTY;
+        }
+        return super.getHoldingItemCapability(hand);
     }
 
     /**

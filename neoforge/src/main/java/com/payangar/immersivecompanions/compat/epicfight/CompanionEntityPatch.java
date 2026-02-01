@@ -1,8 +1,15 @@
 package com.payangar.immersivecompanions.compat.epicfight;
 
 import com.payangar.immersivecompanions.entity.CompanionEntity;
+import net.minecraft.core.Holder;
 import net.minecraft.world.InteractionHand;
+import net.minecraft.world.entity.EquipmentSlot;
+import net.minecraft.world.entity.ai.attributes.Attribute;
+import net.minecraft.world.entity.ai.attributes.AttributeInstance;
+import net.minecraft.world.entity.ai.attributes.AttributeModifier;
+import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.item.CrossbowItem;
+import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.UseAnim;
 import yesman.epicfight.api.animation.Animator;
 import yesman.epicfight.api.animation.LivingMotions;
@@ -12,6 +19,7 @@ import yesman.epicfight.api.utils.math.OpenMatrix4f;
 import yesman.epicfight.gameasset.Animations;
 import yesman.epicfight.model.armature.types.ToolHolderArmature;
 import yesman.epicfight.world.capabilities.entitypatch.Factions;
+import yesman.epicfight.registry.entries.EpicFightAttributes;
 import yesman.epicfight.world.capabilities.entitypatch.HumanoidMobPatch;
 import yesman.epicfight.world.capabilities.item.CapabilityItem;
 import yesman.epicfight.world.entity.ai.goal.AnimatedAttackGoal;
@@ -209,5 +217,115 @@ public class CompanionEntityPatch extends HumanoidMobPatch<CompanionEntity> {
     protected void initAI() {
         super.initAI();
         // Combat AI is handled by setAIAsInfantry
+    }
+
+    /**
+     * Workaround for Epic Fight's HumanoidMobPatch.updateHeldItem() bugs.
+     * <p>
+     * Epic Fight has two bugs causing crashes when re-equipping dual-wielded weapons:
+     * <ol>
+     *   <li>Line 160: Uses {@code to.getAttributeModifiers()} instead of {@code from.getAttributeModifiers()}
+     *       when removing old modifiers</li>
+     *   <li>Line 177: Calls {@code addTransientModifier()} without checking if modifier already exists</li>
+     * </ol>
+     * <p>
+     * This override fixes both issues by:
+     * <ul>
+     *   <li>Using {@code from.getAttributeModifiers()} for removal (correct item)</li>
+     *   <li>Using {@code removeModifier(id)} which is safe if modifier doesn't exist</li>
+     *   <li>Checking {@code hasModifier(id)} before {@code addTransientModifier()}</li>
+     * </ul>
+     */
+    @Override
+    public void updateHeldItem(CapabilityItem fromCap, CapabilityItem toCap, ItemStack from, ItemStack to, InteractionHand hand) {
+        this.initAI();
+
+        if (hand == InteractionHand.OFF_HAND) {
+            // Remove attribute modifiers from the OLD item (from), not the new one
+            if (!from.isEmpty()) {
+                from.getAttributeModifiers().forEach(EquipmentSlot.MAINHAND, (attribute, modifier) -> {
+                    if (attribute == Attributes.ATTACK_SPEED) {
+                        AttributeInstance instance = this.original.getAttribute(EpicFightAttributes.OFFHAND_ATTACK_SPEED);
+                        if (instance != null) {
+                            // removeModifier(id) is safe even if modifier doesn't exist
+                            instance.removeModifier(modifier.id());
+                        }
+                    }
+                });
+            }
+
+            // Remove Epic Fight capability modifiers from the old item
+            if (!fromCap.isEmpty()) {
+                removeCapabilityModifiers(fromCap, Attributes.ATTACK_SPEED, EpicFightAttributes.OFFHAND_ATTACK_SPEED);
+                removeCapabilityModifiers(fromCap, EpicFightAttributes.ARMOR_NEGATION, EpicFightAttributes.OFFHAND_ARMOR_NEGATION);
+                removeCapabilityModifiers(fromCap, EpicFightAttributes.IMPACT, EpicFightAttributes.OFFHAND_IMPACT);
+                removeCapabilityModifiers(fromCap, EpicFightAttributes.MAX_STRIKES, EpicFightAttributes.OFFHAND_MAX_STRIKES);
+            }
+
+            // Add attribute modifiers from the NEW item
+            if (!to.isEmpty()) {
+                to.getAttributeModifiers().forEach(EquipmentSlot.MAINHAND, (attribute, modifier) -> {
+                    if (attribute == Attributes.ATTACK_SPEED) {
+                        addModifierSafely(EpicFightAttributes.OFFHAND_ATTACK_SPEED, modifier);
+                    }
+                });
+            }
+
+            // Add Epic Fight capability modifiers from the new item
+            if (!toCap.isEmpty()) {
+                addCapabilityModifiers(toCap, Attributes.ATTACK_SPEED, EpicFightAttributes.OFFHAND_ATTACK_SPEED);
+                addCapabilityModifiers(toCap, EpicFightAttributes.ARMOR_NEGATION, EpicFightAttributes.OFFHAND_ARMOR_NEGATION);
+                addCapabilityModifiers(toCap, EpicFightAttributes.IMPACT, EpicFightAttributes.OFFHAND_IMPACT);
+                addCapabilityModifiers(toCap, EpicFightAttributes.MAX_STRIKES, EpicFightAttributes.OFFHAND_MAX_STRIKES);
+            }
+        }
+
+        this.modifyLivingMotionByCurrentItem(false);
+
+        // Note: We intentionally skip super.updateHeldItem() because LivingEntityPatch's
+        // implementation is empty, and we've already done everything HumanoidMobPatch does
+    }
+
+    /**
+     * Removes capability attribute modifiers safely (no error if modifier doesn't exist).
+     */
+    private void removeCapabilityModifiers(CapabilityItem cap, Holder<Attribute> sourceAttr, Holder<Attribute> targetAttr) {
+        AttributeInstance instance = this.original.getAttribute(targetAttr);
+        if (instance != null) {
+            cap.getAttributeModifiers(this).get(sourceAttr).forEach(modifier ->
+                instance.removeModifier(modifier.id())
+            );
+        }
+    }
+
+    /**
+     * Adds capability attribute modifiers safely (checks if modifier already exists).
+     */
+    private void addCapabilityModifiers(CapabilityItem cap, Holder<Attribute> sourceAttr, Holder<Attribute> targetAttr) {
+        AttributeInstance instance = this.original.getAttribute(targetAttr);
+        if (instance != null) {
+            cap.getAttributeModifiers(this).get(sourceAttr).forEach(modifier ->
+                addModifierSafely(instance, modifier)
+            );
+        }
+    }
+
+    /**
+     * Adds a transient modifier only if it doesn't already exist on the attribute instance.
+     */
+    private void addModifierSafely(Holder<Attribute> attribute, AttributeModifier modifier) {
+        AttributeInstance instance = this.original.getAttribute(attribute);
+        if (instance != null) {
+            addModifierSafely(instance, modifier);
+        }
+    }
+
+    /**
+     * Adds a transient modifier only if it doesn't already exist on the attribute instance.
+     */
+    private void addModifierSafely(AttributeInstance instance, AttributeModifier modifier) {
+        if (!instance.hasModifier(modifier.id())) {
+            instance.addTransientModifier(modifier);
+        }
     }
 }

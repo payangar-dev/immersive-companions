@@ -2,38 +2,26 @@ package com.payangar.immersivecompanions.compat.epicfight;
 
 import com.payangar.immersivecompanions.ImmersiveCompanions;
 import com.payangar.immersivecompanions.registry.NeoForgeEntityRegistration;
-import net.neoforged.bus.api.IEventBus;
-import yesman.epicfight.api.client.neoevent.PatchedRenderersEvent;
+import yesman.epicfight.api.client.event.EpicFightClientEventHooks;
 
 /**
  * Client-side Epic Fight compatibility.
  * Registers the patched renderer for companion entities.
- *
- * Note: This class must NOT use @EventBusSubscriber because NeoForge's AutomaticEventSubscriber
- * would try to load it even when Epic Fight is not installed, causing NoClassDefFoundError.
- * Instead, events are registered manually in init().
  */
 public class EpicFightClientCompat {
 
     /**
      * Initializes client-side Epic Fight compatibility.
-     * Call this from the mod constructor when Epic Fight is detected (client-side only).
-     *
-     * @param modEventBus The mod event bus to register listeners on
+     * Call this from EpicFightCompat.init() when Epic Fight is detected (client-side only).
      */
-    public static void init(IEventBus modEventBus) {
-        modEventBus.addListener(EpicFightClientCompat::registerPatchedRenderer);
-    }
-
-    /**
-     * Registers the patched renderer for companion entities.
-     * This event is fired on the MOD bus during client-side mod loading.
-     */
-    private static void registerPatchedRenderer(PatchedRenderersEvent.Add event) {
-        event.addPatchedEntityRenderer(
-            NeoForgeEntityRegistration.COMPANION.get(),
-            entityType -> new PCompanionRenderer(event.getContext(), entityType)
-        );
-        ImmersiveCompanions.LOGGER.debug("Registered CompanionEntity patched renderer with Epic Fight");
+    public static void init() {
+        // Register patched renderer via Epic Fight's client event system
+        EpicFightClientEventHooks.Registry.ADD_PATCHED_ENTITY.registerEvent(event -> {
+            event.addPatchedEntityRenderer(
+                NeoForgeEntityRegistration.COMPANION.get(),
+                entityType -> new PCompanionRenderer(event.getContext(), entityType)
+            );
+            ImmersiveCompanions.LOGGER.debug("Registered CompanionEntity patched renderer with Epic Fight");
+        });
     }
 }

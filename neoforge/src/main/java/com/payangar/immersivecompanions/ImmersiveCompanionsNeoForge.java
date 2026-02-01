@@ -42,7 +42,7 @@ public class ImmersiveCompanionsNeoForge {
         // Initialize Epic Fight compatibility if present
         // Uses isolated class loading to prevent NoClassDefFoundError when Epic Fight is absent
         if (ModList.get().isLoaded("epicfight")) {
-            initEpicFightCompat(modEventBus);
+            initEpicFightCompat();
         }
 
         // Initialize Waystones compatibility if present
@@ -60,8 +60,8 @@ public class ImmersiveCompanionsNeoForge {
      * when this method is called, preventing class loading errors when
      * Epic Fight is not installed.
      */
-    private void initEpicFightCompat(IEventBus modEventBus) {
-        EpicFightCompat.init(modEventBus);
+    private void initEpicFightCompat() {
+        EpicFightCompat.init();
     }
 
     /**

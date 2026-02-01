@@ -4,7 +4,6 @@ import com.payangar.immersivecompanions.entity.CompanionEntity;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.item.CrossbowItem;
 import net.minecraft.world.item.UseAnim;
-import net.neoforged.neoforge.event.tick.EntityTickEvent;
 import yesman.epicfight.api.animation.Animator;
 import yesman.epicfight.api.animation.LivingMotions;
 import yesman.epicfight.api.animation.types.StaticAnimation;
@@ -61,8 +60,8 @@ public class CompanionEntityPatch extends HumanoidMobPatch<CompanionEntity> {
     }
 
     @Override
-    public void preTick(EntityTickEvent.Pre event) {
-        super.preTick(event);
+    public void preTick() {
+        super.preTick();
 
         // Server-side: detect holster state changes and update animations/AI
         if (!this.isLogicalClient()) {

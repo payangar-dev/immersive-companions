@@ -7,6 +7,10 @@
     "config.immersivecompanions.criticalInjuryThreshold.desc": "Health threshold (in half-hearts) at which companions become critically injured. Default: 4 (2 hearts)",
     "config.immersivecompanions.criticalInjurySpeedMultiplier": "Injured Speed Multiplier",
     "config.immersivecompanions.criticalInjurySpeedMultiplier.desc": "Movement speed multiplier when critically injured. 0.5 = 50% speed. Default: 0.5",
+    "config.immersivecompanions.enableCompanionRevival": "Enable Companion Revival",
+    "config.immersivecompanions.enableCompanionRevival.desc": "Allow companions to revive knocked-out owners (requires Hardcore Revival mod)",
+    "config.immersivecompanions.companionRevivalTicks": "Revival Time (ticks)",
+    "config.immersivecompanions.companionRevivalTicks.desc": "How long companions take to revive their owner. 60 ticks = 3 seconds. Default: 60",
 
     "gui.immersivecompanions.recruitment.title": "Recruit Companion",
     "gui.immersivecompanions.recruitment.dialogue": "I'll guard your back if you make it worth my while...",

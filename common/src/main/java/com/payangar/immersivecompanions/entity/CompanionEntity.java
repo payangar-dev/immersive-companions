@@ -17,6 +17,7 @@ import com.payangar.immersivecompanions.entity.ai.CompanionInteractionGoal;
 import com.payangar.immersivecompanions.entity.ai.CompanionMeleeAttackGoal;
 import com.payangar.immersivecompanions.entity.ai.CompanionNearestAttackableTargetGoal;
 import com.payangar.immersivecompanions.entity.ai.CompanionRangedAttackGoal;
+import com.payangar.immersivecompanions.entity.ai.CompanionReviveOwnerGoal;
 import com.payangar.immersivecompanions.entity.ai.CompanionShieldBlockGoal;
 import com.payangar.immersivecompanions.entity.ai.CompanionTeamCoordinationGoal;
 import com.payangar.immersivecompanions.entity.ai.CompanionWaterAvoidingRandomStrollGoal;
@@ -30,7 +31,6 @@ import com.payangar.immersivecompanions.inventory.CompanionEquipmentMenu;
 import com.payangar.immersivecompanions.network.ModNetworking;
 import com.payangar.immersivecompanions.platform.Services;
 import com.payangar.immersivecompanions.recruitment.CompanionPricing;
-import net.minecraft.core.BlockPos;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.Tag;
@@ -153,6 +153,12 @@ public class CompanionEntity extends PathfinderMob implements RangedAttackMob {
      */
     private int shieldCoolDown = 0;
 
+    /**
+     * Whether the companion is currently reviving their knocked-out owner.
+     * Set by CompanionReviveOwnerGoal to prevent tick() from overriding crouch state.
+     */
+    private boolean isRevivingOwner = false;
+
     /** UUID of the player who owns this companion (null if unbought) */
     @Nullable
     private UUID ownerUUID = null;
@@ -240,6 +246,9 @@ public class CompanionEntity extends PathfinderMob implements RangedAttackMob {
 
         // Priority 1: Flee from attackers (active when shouldFlee() returns true)
         this.goalSelector.addGoal(1, new CompanionFleeFromAttackerGoal(this));
+
+        // Priority 1: Revive knocked-out owner (Hardcore Revival compat)
+        this.goalSelector.addGoal(1, new CompanionReviveOwnerGoal(this));
 
                 // Priority 1: Shield blocking - proactive/reactive blocking for melee companions
         // Must be priority 1 to compete with melee attack for LOOK flag when blocking
@@ -514,6 +523,22 @@ public class CompanionEntity extends PathfinderMob implements RangedAttackMob {
      */
     public boolean shouldFlee() {
         return isPassive() || isCriticallyInjured();
+    }
+
+    /**
+     * Checks if the companion is currently reviving their knocked-out owner.
+     * Used to prevent tick() from overriding crouch state during revival.
+     */
+    public boolean isRevivingOwner() {
+        return isRevivingOwner;
+    }
+
+    /**
+     * Sets whether the companion is reviving their knocked-out owner.
+     * Called by CompanionReviveOwnerGoal.
+     */
+    public void setRevivingOwner(boolean reviving) {
+        this.isRevivingOwner = reviving;
     }
 
     /**
@@ -1147,15 +1172,16 @@ public class CompanionEntity extends PathfinderMob implements RangedAttackMob {
                 stopSprinting();
             }
 
-            if (((this.getMode() == CompanionMode.FOLLOW && this.getOwner().isCrouching()) || this.isCriticallyInjured())) {
-                if (!this.isCrouching()) {
-                    startSneaking();
+            // Crouch when: owner is crouching (follow mode), critically injured, or reviving owner
+                if ((this.getMode() == CompanionMode.FOLLOW && this.getOwner().isCrouching()) || this.isCriticallyInjured() || this.isRevivingOwner()) {
+                    if (!this.isCrouching()) {
+                        startSneaking();
+                    }
+                } else {
+                    if (this.isCrouching()) {
+                        stopSneaking();
+                    }
                 }
-            } else {
-                if (this.isCrouching()) {
-                    stopSneaking();
-                }
-            }
 
             // Update weapon holster state based on target presence
             updateWeaponHolsterState();

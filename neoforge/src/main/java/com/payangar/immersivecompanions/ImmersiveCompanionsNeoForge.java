@@ -51,6 +51,12 @@ public class ImmersiveCompanionsNeoForge {
             initWaystonesCompat();
         }
 
+        // Initialize Hardcore Revival compatibility if present
+        // Uses isolated class loading to prevent NoClassDefFoundError when Hardcore Revival is absent
+        if (ModList.get().isLoaded("hardcorerevival")) {
+            initHardcoreRevivalCompat();
+        }
+
         ImmersiveCompanions.init();
     }
 
@@ -72,6 +78,16 @@ public class ImmersiveCompanionsNeoForge {
      */
     private void initWaystonesCompat() {
         com.payangar.immersivecompanions.compat.waystones.WaystonesCompatNeoForge.init();
+    }
+
+    /**
+     * Isolated method to initialize Hardcore Revival compatibility.
+     * This method references HardcoreRevivalCompatNeoForge which will only be loaded
+     * when this method is called, preventing class loading errors when
+     * Hardcore Revival is not installed.
+     */
+    private void initHardcoreRevivalCompat() {
+        com.payangar.immersivecompanions.compat.hardcorerevival.HardcoreRevivalCompatNeoForge.init();
     }
 
     /**

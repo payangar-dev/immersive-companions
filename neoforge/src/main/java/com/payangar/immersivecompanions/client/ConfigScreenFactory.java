@@ -6,6 +6,7 @@ import dev.isxander.yacl3.api.Option;
 import dev.isxander.yacl3.api.OptionDescription;
 import dev.isxander.yacl3.api.YetAnotherConfigLib;
 import dev.isxander.yacl3.api.controller.FloatSliderControllerBuilder;
+import dev.isxander.yacl3.api.controller.IntegerSliderControllerBuilder;
 import dev.isxander.yacl3.api.controller.TickBoxControllerBuilder;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
@@ -46,6 +47,26 @@ public class ConfigScreenFactory {
                                 .controller(opt -> FloatSliderControllerBuilder.create(opt)
                                         .range(0.1f, 1.0f)
                                         .step(0.1f))
+                                .build())
+                        .option(Option.<Boolean>createBuilder()
+                                .name(Component.translatable("config.immersivecompanions.enableCompanionRevival"))
+                                .description(OptionDescription.of(
+                                        Component.translatable("config.immersivecompanions.enableCompanionRevival.desc")))
+                                .binding(true,
+                                        () -> ModConfig.enableCompanionRevival,
+                                        v -> ModConfig.enableCompanionRevival = v)
+                                .controller(TickBoxControllerBuilder::create)
+                                .build())
+                        .option(Option.<Integer>createBuilder()
+                                .name(Component.translatable("config.immersivecompanions.companionRevivalTicks"))
+                                .description(OptionDescription.of(
+                                        Component.translatable("config.immersivecompanions.companionRevivalTicks.desc")))
+                                .binding(60,
+                                        () -> ModConfig.companionRevivalTicks,
+                                        v -> ModConfig.companionRevivalTicks = v)
+                                .controller(opt -> IntegerSliderControllerBuilder.create(opt)
+                                        .range(20, 200)
+                                        .step(10))
                                 .build())
                         .build())
                 .save(ModConfig::save)

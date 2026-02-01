@@ -27,6 +27,8 @@ public class ModConfig {
     public static boolean enableMonstersTargetCompanions = true;
     public static boolean enableTeamCoordination = true;
     public static float teamCoordinationRange = 16.0f;
+    public static boolean enableCompanionRevival = true;
+    public static int companionRevivalTicks = 60;
 
     // Internal class for JSON serialization
     private static class ConfigData {
@@ -36,6 +38,8 @@ public class ModConfig {
         boolean enableMonstersTargetCompanions = true;
         boolean enableTeamCoordination = true;
         float teamCoordinationRange = 16.0f;
+        boolean enableCompanionRevival = true;
+        int companionRevivalTicks = 60;
     }
 
     /**
@@ -111,6 +115,8 @@ public class ModConfig {
                     enableMonstersTargetCompanions = data.enableMonstersTargetCompanions;
                     enableTeamCoordination = data.enableTeamCoordination;
                     teamCoordinationRange = data.teamCoordinationRange;
+                    enableCompanionRevival = data.enableCompanionRevival;
+                    companionRevivalTicks = data.companionRevivalTicks;
                 }
                 ImmersiveCompanions.LOGGER.info("Loaded config from {}", configPath);
             } catch (IOException e) {
@@ -138,6 +144,8 @@ public class ModConfig {
             data.enableMonstersTargetCompanions = enableMonstersTargetCompanions;
             data.enableTeamCoordination = enableTeamCoordination;
             data.teamCoordinationRange = teamCoordinationRange;
+            data.enableCompanionRevival = enableCompanionRevival;
+            data.companionRevivalTicks = companionRevivalTicks;
             String json = GSON.toJson(data);
             Files.writeString(configPath, json);
         } catch (IOException e) {

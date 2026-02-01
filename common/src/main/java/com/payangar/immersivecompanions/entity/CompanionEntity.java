@@ -11,6 +11,7 @@ import com.payangar.immersivecompanions.entity.ai.CompanionDefendVillageGoal;
 import com.payangar.immersivecompanions.entity.ai.CompanionFleeFromAttackerGoal;
 import com.payangar.immersivecompanions.entity.ai.CompanionFloatGoal;
 import com.payangar.immersivecompanions.entity.ai.CompanionFollowOwnerGoal;
+import com.payangar.immersivecompanions.entity.ai.CompanionGapJumpGoal;
 import com.payangar.immersivecompanions.entity.ai.CompanionHurtByTargetGoal;
 import com.payangar.immersivecompanions.entity.ai.CompanionInteractionGoal;
 import com.payangar.immersivecompanions.entity.ai.CompanionMeleeAttackGoal;
@@ -18,7 +19,6 @@ import com.payangar.immersivecompanions.entity.ai.CompanionNearestAttackableTarg
 import com.payangar.immersivecompanions.entity.ai.CompanionRangedAttackGoal;
 import com.payangar.immersivecompanions.entity.ai.CompanionTeamCoordinationGoal;
 import com.payangar.immersivecompanions.entity.ai.CompanionWaterAvoidingRandomStrollGoal;
-import com.payangar.immersivecompanions.entity.ai.GapJumpHelper;
 import com.payangar.immersivecompanions.entity.ai.pathfinding.CompanionGroundPathNavigation;
 import com.payangar.immersivecompanions.entity.combat.CombatStance;
 import com.payangar.immersivecompanions.entity.condition.ActionType;
@@ -29,6 +29,7 @@ import com.payangar.immersivecompanions.inventory.CompanionEquipmentMenu;
 import com.payangar.immersivecompanions.network.ModNetworking;
 import com.payangar.immersivecompanions.platform.Services;
 import com.payangar.immersivecompanions.recruitment.CompanionPricing;
+import net.minecraft.core.BlockPos;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.Tag;
@@ -141,15 +142,6 @@ public class CompanionEntity extends PathfinderMob implements RangedAttackMob {
      */
     private int ticksSinceLastTarget = Integer.MAX_VALUE;
 
-    /**
-     * Cooldown in ticks before another gap jump can be attempted.
-     * Prevents rapid re-attempts when approaching gaps.
-     */
-    private int gapJumpCooldown = 0;
-
-    /** Cooldown duration in ticks after a gap jump attempt (10 ticks = 0.5 seconds) */
-    private static final int GAP_JUMP_COOLDOWN_TICKS = 10;
-
     /** UUID of the player who owns this companion (null if unbought) */
     @Nullable
     private UUID ownerUUID = null;
@@ -242,6 +234,9 @@ public class CompanionEntity extends PathfinderMob implements RangedAttackMob {
         // Priority 1: Combat goals - both registered, but check combat type in canUse()
         this.goalSelector.addGoal(1, new CompanionMeleeAttackGoal(this, 1.0, true));
         this.goalSelector.addGoal(1, new CompanionRangedAttackGoal(this, 1.0, 20, 15.0F, 6.0F));
+
+        // Priority 2: Gap jumping - executes jumps across gaps when following owner
+        this.goalSelector.addGoal(2, new CompanionGapJumpGoal(this));
 
         // Priority 3: Door interaction (like villagers)
         this.goalSelector.addGoal(3, new OpenDoorGoal(this, true));
@@ -600,28 +595,6 @@ public class CompanionEntity extends PathfinderMob implements RangedAttackMob {
 
         if (isWeaponHolstered() != shouldHostered) {
             setWeaponHolstered(shouldHostered);
-        }
-    }
-
-    // ========== Gap Jump System ==========
-
-    /**
-     * Attempts to detect and jump over a gap ahead of the companion.
-     * Only called when sprinting and on ground, with no active cooldown.
-     */
-    private void attemptGapJump() {
-        // Check if we're near a gap edge
-        if (!GapJumpHelper.isNearGapEdge(this)) {
-            return;
-        }
-
-        // Detect the full gap
-        GapJumpHelper.GapInfo gap = GapJumpHelper.detectGapAhead(this);
-
-        // Check if we should jump
-        if (GapJumpHelper.shouldJump(this, gap)) {
-            GapJumpHelper.performGapJump(this, gap);
-            gapJumpCooldown = GAP_JUMP_COOLDOWN_TICKS;
         }
     }
 
@@ -1148,13 +1121,6 @@ public class CompanionEntity extends PathfinderMob implements RangedAttackMob {
 
             if (isSprinting()) {
                 spawnSprintParticle();
-            }
-
-            // Gap-jump detection and execution
-            if (gapJumpCooldown > 0) {
-                gapJumpCooldown--;
-            } else if (isSprinting() && onGround()) {
-                attemptGapJump();
             }
 
             // Enforce sprint restrictions - stop sprinting if no longer allowed

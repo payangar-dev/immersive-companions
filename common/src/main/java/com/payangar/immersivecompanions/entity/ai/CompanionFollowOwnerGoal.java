@@ -82,7 +82,6 @@ public class CompanionFollowOwnerGoal extends Goal {
 
     @Override
     public boolean canContinueToUse() {
-        // Stop following if mode changed
         if (companion.getMode() != CompanionMode.FOLLOW) {
             return false;
         }

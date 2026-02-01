@@ -9,6 +9,9 @@ import net.minecraft.world.level.pathfinder.PathFinder;
  * Custom ground navigation that uses CompanionWalkNodeEvaluator.
  * This enables condition-aware pathfinding where jump restrictions
  * are respected during path calculation.
+ *
+ * Gap jumping is handled separately by CompanionGapJumpGoal, which
+ * runs as an independent goal and scans ahead for gaps to jump.
  */
 public class CompanionGroundPathNavigation extends GroundPathNavigation {
 

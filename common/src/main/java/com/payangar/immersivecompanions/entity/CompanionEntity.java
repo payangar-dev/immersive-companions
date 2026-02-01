@@ -17,6 +17,7 @@ import com.payangar.immersivecompanions.entity.ai.CompanionInteractionGoal;
 import com.payangar.immersivecompanions.entity.ai.CompanionMeleeAttackGoal;
 import com.payangar.immersivecompanions.entity.ai.CompanionNearestAttackableTargetGoal;
 import com.payangar.immersivecompanions.entity.ai.CompanionRangedAttackGoal;
+import com.payangar.immersivecompanions.entity.ai.CompanionShieldBlockGoal;
 import com.payangar.immersivecompanions.entity.ai.CompanionTeamCoordinationGoal;
 import com.payangar.immersivecompanions.entity.ai.CompanionWaterAvoidingRandomStrollGoal;
 import com.payangar.immersivecompanions.entity.ai.pathfinding.CompanionGroundPathNavigation;
@@ -58,6 +59,7 @@ import net.minecraft.world.item.BowItem;
 import net.minecraft.world.item.CrossbowItem;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
+import net.minecraft.world.item.ShieldItem;
 import net.minecraft.world.inventory.AbstractContainerMenu;
 import net.minecraft.world.MenuProvider;
 import net.minecraft.world.level.Level;
@@ -108,6 +110,10 @@ public class CompanionEntity extends PathfinderMob implements RangedAttackMob {
     private static final ResourceLocation SPRINT_SPEED_MODIFIER_ID = ResourceLocation.fromNamespaceAndPath(
             "immersivecompanions", "sprint_speed");
 
+    /** Attribute modifier ID for shield blocking speed reduction */
+    private static final ResourceLocation SHIELD_SPEED_MODIFIER_ID = ResourceLocation.fromNamespaceAndPath(
+            "immersivecompanions", "shield_slow");
+
     /**
      * Callback for post-ranged-attack events (used by Epic Fight compat for
      * shooting animation)
@@ -141,6 +147,13 @@ public class CompanionEntity extends PathfinderMob implements RangedAttackMob {
      * Used for delayed weapon holstering. Server-side only, not persisted.
      */
     private int ticksSinceLastTarget = Integer.MAX_VALUE;
+
+    /**
+     * Shield cooldown in ticks. When > 0, the companion cannot raise their shield.
+     * Set by melee attack to prevent immediate re-blocking after swinging.
+     * Decremented each tick in aiStep().
+     */
+    private int shieldCoolDown = 0;
 
     /** UUID of the player who owns this companion (null if unbought) */
     @Nullable
@@ -230,6 +243,10 @@ public class CompanionEntity extends PathfinderMob implements RangedAttackMob {
 
         // Priority 1: Flee from attackers (active when shouldFlee() returns true)
         this.goalSelector.addGoal(1, new CompanionFleeFromAttackerGoal(this));
+
+                // Priority 1: Shield blocking - proactive/reactive blocking for melee companions
+        // Must be priority 1 to compete with melee attack for LOOK flag when blocking
+        this.goalSelector.addGoal(1, new CompanionShieldBlockGoal(this));
 
         // Priority 1: Combat goals - both registered, but check combat type in canUse()
         this.goalSelector.addGoal(1, new CompanionMeleeAttackGoal(this, 1.0, true));
@@ -1063,6 +1080,25 @@ public class CompanionEntity extends PathfinderMob implements RangedAttackMob {
         return hurt;
     }
 
+    @Override
+    protected void playHurtSound(DamageSource source) {
+        // Play shield block sound instead of hurt sound when blocking
+        if (this.isBlocking() && this.isDamageSourceBlocked(source)) {
+            this.playSound(SoundEvents.SHIELD_BLOCK, 1.0F, 0.8F + this.level().random.nextFloat() * 0.4F);
+            return;
+        }
+        super.playHurtSound(source);
+    }
+
+    @Override
+    public void knockback(double strength, double x, double z) {
+        // Reduce knockback when blocking with shield
+        if (this.isBlocking()) {
+            strength *= 0.25; // 75% reduction
+        }
+        super.knockback(strength, x, z);
+    }
+
     private void spreadNegativeGossip(Player player) {
         if (!(this.level() instanceof ServerLevel serverLevel))
             return;
@@ -1164,6 +1200,11 @@ public class CompanionEntity extends PathfinderMob implements RangedAttackMob {
 
     @Override
     public void aiStep() {
+        // Tick shield cooldown before other AI logic
+        if (this.shieldCoolDown > 0) {
+            this.shieldCoolDown--;
+        }
+
         updateSwingTime(); // Required for melee attack animation to work
         super.aiStep();
     }
@@ -1177,6 +1218,74 @@ public class CompanionEntity extends PathfinderMob implements RangedAttackMob {
     public boolean canUseRangedWeapon() {
         ItemStack mainHand = this.getMainHandItem();
         return mainHand.getItem() instanceof BowItem || mainHand.getItem() instanceof CrossbowItem;
+    }
+
+    /**
+     * Checks if this companion has a shield in their offhand.
+     *
+     * @return true if holding a shield
+     */
+    public boolean hasShield() {
+        return getOffhandItem().getItem() instanceof ShieldItem;
+    }
+
+    /**
+     * Checks if this companion is currently blocking with a shield.
+     *
+     * @return true if actively blocking with shield
+     */
+    public boolean isShieldBlocking() {
+        return isUsingItem() && getUsedItemHand() == InteractionHand.OFF_HAND
+                && getUseItem().getItem() instanceof ShieldItem;
+    }
+
+    /**
+     * Gets the current shield cooldown in ticks.
+     * When > 0, the companion cannot raise their shield.
+     *
+     * @return remaining cooldown ticks
+     */
+    public int getShieldCoolDown() {
+        return this.shieldCoolDown;
+    }
+
+    /**
+     * Sets the shield cooldown. Used by melee attack to prevent
+     * immediate re-blocking after swinging.
+     *
+     * @param ticks cooldown duration in ticks
+     */
+    public void setShieldCoolDown(int ticks) {
+        this.shieldCoolDown = ticks;
+    }
+
+    /**
+     * Override to apply speed penalty when raising shield.
+     * This matches guardvillagers behavior for more realistic blocking movement.
+     */
+    @Override
+    public void startUsingItem(InteractionHand hand) {
+        super.startUsingItem(hand);
+        ItemStack itemstack = this.getItemInHand(hand);
+        if (itemstack.getItem() instanceof ShieldItem) {
+            AttributeInstance speed = this.getAttribute(Attributes.MOVEMENT_SPEED);
+            if (speed != null && !speed.hasModifier(SHIELD_SPEED_MODIFIER_ID)) {
+                speed.addTransientModifier(new AttributeModifier(
+                        SHIELD_SPEED_MODIFIER_ID, -0.05, AttributeModifier.Operation.ADD_MULTIPLIED_TOTAL));
+            }
+        }
+    }
+
+    /**
+     * Override to remove shield speed penalty when lowering shield.
+     */
+    @Override
+    public void stopUsingItem() {
+        super.stopUsingItem();
+        AttributeInstance speed = this.getAttribute(Attributes.MOVEMENT_SPEED);
+        if (speed != null) {
+            speed.removeModifier(SHIELD_SPEED_MODIFIER_ID);
+        }
     }
 
     @Override

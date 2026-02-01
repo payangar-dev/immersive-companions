@@ -2,6 +2,7 @@ package com.payangar.immersivecompanions.entity.ai;
 
 import com.payangar.immersivecompanions.entity.CompanionEntity;
 
+import net.minecraft.world.InteractionHand;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.ai.goal.MeleeAttackGoal;
 
@@ -79,6 +80,30 @@ public class CompanionMeleeAttackGoal extends MeleeAttackGoal {
         companion.setAggressive(false);
         if (companion.isSprinting()) {
             companion.stopSprinting();
+        }
+    }
+
+    /**
+     * Override to manage shield blocking when attacking.
+     * Stops blocking and sets a brief cooldown to prevent immediate re-blocking.
+     */
+    @Override
+    protected void checkAndPerformAttack(LivingEntity enemy) {
+        if (this.canPerformAttack(enemy)) {
+            this.resetAttackCooldown();
+
+            // Manage shield if companion has one
+            if (companion.hasShield()) {
+                // Stop blocking before attacking
+                companion.stopUsingItem();
+                // Brief cooldown prevents immediate re-blocking (8 ticks = 0.4 sec)
+                if (companion.getShieldCoolDown() == 0) {
+                    companion.setShieldCoolDown(8);
+                }
+            }
+
+            companion.swing(InteractionHand.MAIN_HAND);
+            companion.doHurtTarget(enemy);
         }
     }
 }

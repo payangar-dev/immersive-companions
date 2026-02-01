@@ -18,6 +18,7 @@ import net.minecraft.world.entity.HumanoidArm;
 import net.minecraft.world.item.BowItem;
 import net.minecraft.world.item.CrossbowItem;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.UseAnim;
 
 /**
  * Renders companions using player models (Steve/Alex).
@@ -76,6 +77,23 @@ public class CompanionRenderer extends HumanoidMobRenderer<CompanionEntity, Play
      * When weapon is holstered, arms stay lowered. When drawn, applies appropriate weapon poses.
      */
     private void setModelArmPose(CompanionEntity entity) {
+        // Check for shield blocking FIRST - highest priority
+        // getUseItemRemainingTicks() > 0 means an item is actively being used
+        if (entity.getUseItemRemainingTicks() > 0) {
+            ItemStack itemInUse = entity.getUseItem();
+            if (itemInUse.getUseAnimation() == UseAnim.BLOCK) {
+                // Shield is being used - set BLOCK pose for offhand
+                if (entity.getMainArm() == HumanoidArm.RIGHT) {
+                    this.model.leftArmPose = HumanoidModel.ArmPose.BLOCK;
+                    this.model.rightArmPose = HumanoidModel.ArmPose.EMPTY;
+                } else {
+                    this.model.rightArmPose = HumanoidModel.ArmPose.BLOCK;
+                    this.model.leftArmPose = HumanoidModel.ArmPose.EMPTY;
+                }
+                return; // Don't check other poses
+            }
+        }
+
         // During melee swing, let vanilla HumanoidModel.setupAnim() handle the arm animation
         // Only skip for melee companions (ranged have their own arm poses that should be maintained)
         if (entity.swinging && !entity.getCombatType().isRanged()) {

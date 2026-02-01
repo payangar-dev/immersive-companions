@@ -58,6 +58,11 @@ public class CompanionEquipment {
         Item weapon = weaponList.get(random.nextInt(weaponList.size()));
         companion.setItemSlot(EquipmentSlot.MAINHAND, new ItemStack(weapon));
 
+        // 50% chance for melee companions to get a shield
+        if (!combatType.isRanged() && random.nextFloat() < 0.5f) {
+            companion.setItemSlot(EquipmentSlot.OFFHAND, new ItemStack(Items.SHIELD));
+        }
+
         // Equip random armor pieces
         equipArmorPiece(companion, EquipmentSlot.HEAD, HELMETS, random);
         equipArmorPiece(companion, EquipmentSlot.CHEST, CHESTPLATES, random);

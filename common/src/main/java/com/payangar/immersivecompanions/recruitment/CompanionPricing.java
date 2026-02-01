@@ -112,6 +112,12 @@ public class CompanionPricing {
         ItemStack weapon = companion.getMainHandItem();
         bonus += WEAPON_BONUSES.getOrDefault(weapon.getItem(), 0);
 
+        // Check offhand (shield)
+        ItemStack offhand = companion.getItemBySlot(EquipmentSlot.OFFHAND);
+        if (offhand.getItem() == Items.SHIELD) {
+            bonus += 5;  // Shield adds 5 emeralds
+        }
+
         return bonus;
     }
 

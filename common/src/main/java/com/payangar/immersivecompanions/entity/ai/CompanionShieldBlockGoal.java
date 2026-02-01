@@ -50,8 +50,8 @@ public class CompanionShieldBlockGoal extends Goal {
             return false;
         }
 
-        // Only melee companions with shields can use this goal
-        if (companion.getCombatType().isRanged()) {
+        // Only companions without ranged weapons can use this goal
+        if (companion.canUseRangedWeapon()) {
             return false;
         }
         if (!companion.hasShield()) {
@@ -76,7 +76,7 @@ public class CompanionShieldBlockGoal extends Goal {
             return false;
         }
 
-        if (companion.getCombatType().isRanged()) {
+        if (companion.canUseRangedWeapon()) {
             return false;
         }
         if (!companion.hasShield()) {

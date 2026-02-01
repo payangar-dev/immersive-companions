@@ -80,8 +80,6 @@ public class CompanionEntity extends PathfinderMob implements RangedAttackMob {
 
     private static final EntityDataAccessor<Integer> DATA_GENDER = SynchedEntityData.defineId(
             CompanionEntity.class, EntityDataSerializers.INT);
-    private static final EntityDataAccessor<Integer> DATA_COMBAT_TYPE = SynchedEntityData.defineId(
-            CompanionEntity.class, EntityDataSerializers.INT);
     private static final EntityDataAccessor<Integer> DATA_SKIN_INDEX = SynchedEntityData.defineId(
             CompanionEntity.class, EntityDataSerializers.INT);
     private static final EntityDataAccessor<Boolean> DATA_CHARGING = SynchedEntityData.defineId(
@@ -217,7 +215,6 @@ public class CompanionEntity extends PathfinderMob implements RangedAttackMob {
     protected void defineSynchedData(SynchedEntityData.Builder builder) {
         super.defineSynchedData(builder);
         builder.define(DATA_GENDER, CompanionGender.MALE.ordinal());
-        builder.define(DATA_COMBAT_TYPE, CompanionType.MELEE.ordinal());
         builder.define(DATA_SKIN_INDEX, 0);
         builder.define(DATA_CHARGING, false);
         builder.define(DATA_TEAM, DEFAULT_TEAM);
@@ -301,15 +298,14 @@ public class CompanionEntity extends PathfinderMob implements RangedAttackMob {
 
         // Randomize appearance
         CompanionGender gender = CompanionGender.random(level.getRandom());
-        CompanionType combatType = CompanionType.random(level.getRandom());
         int skinIndex = level.getRandom().nextInt(CompanionSkins.getSkinCount(gender));
 
         setGender(gender);
-        setCombatType(combatType);
         setSkinIndex(skinIndex);
 
-        // Equip based on combat type
-        CompanionEquipment.equipCompanion(this, combatType, level.getRandom());
+        // Equip with random weapon type (melee or ranged)
+        boolean giveRangedWeapon = level.getRandom().nextBoolean();
+        CompanionEquipment.equipCompanion(this, giveRangedWeapon, level.getRandom());
 
         // Calculate and store base price (must be after equipment is set)
         setBasePrice(CompanionPricing.calculateBasePrice(this));
@@ -328,15 +324,6 @@ public class CompanionEntity extends PathfinderMob implements RangedAttackMob {
 
     public void setGender(CompanionGender gender) {
         this.entityData.set(DATA_GENDER, gender.ordinal());
-    }
-
-    public CompanionType getCombatType() {
-        int ordinal = this.entityData.get(DATA_COMBAT_TYPE);
-        return CompanionType.values()[ordinal];
-    }
-
-    public void setCombatType(CompanionType type) {
-        this.entityData.set(DATA_COMBAT_TYPE, type.ordinal());
     }
 
     public int getSkinIndex() {
@@ -902,7 +889,6 @@ public class CompanionEntity extends PathfinderMob implements RangedAttackMob {
     public void addAdditionalSaveData(CompoundTag tag) {
         super.addAdditionalSaveData(tag);
         tag.putInt("Gender", getGender().ordinal());
-        tag.putInt("CombatType", getCombatType().ordinal());
         tag.putInt("SkinIndex", getSkinIndex());
         tag.putString("Team", getCompanionTeam());
         tag.putBoolean("CriticallyInjured", isCriticallyInjured());
@@ -942,9 +928,6 @@ public class CompanionEntity extends PathfinderMob implements RangedAttackMob {
         super.readAdditionalSaveData(tag);
         if (tag.contains("Gender")) {
             setGender(CompanionGender.values()[tag.getInt("Gender")]);
-        }
-        if (tag.contains("CombatType")) {
-            setCombatType(CompanionType.values()[tag.getInt("CombatType")]);
         }
         if (tag.contains("SkinIndex")) {
             setSkinIndex(tag.getInt("SkinIndex"));

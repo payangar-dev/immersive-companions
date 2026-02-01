@@ -1,7 +1,6 @@
 package com.payangar.immersivecompanions.data;
 
 import com.payangar.immersivecompanions.entity.CompanionEntity;
-import com.payangar.immersivecompanions.entity.CompanionType;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.item.Item;
@@ -46,20 +45,20 @@ public class CompanionEquipment {
     );
 
     /**
-     * Equips a companion with randomized gear based on their combat type.
+     * Equips a companion with randomized gear based on weapon type.
      *
-     * @param companion  The companion entity to equip
-     * @param combatType The combat type (MELEE or RANGED)
-     * @param random     The random source to use
+     * @param companion        The companion entity to equip
+     * @param giveRangedWeapon Whether to give a ranged weapon (bow/crossbow) or melee weapon
+     * @param random           The random source to use
      */
-    public static void equipCompanion(CompanionEntity companion, CompanionType combatType, RandomSource random) {
-        // Equip weapon based on combat type
-        List<Item> weaponList = combatType.isRanged() ? RANGED_WEAPONS : MELEE_WEAPONS;
+    public static void equipCompanion(CompanionEntity companion, boolean giveRangedWeapon, RandomSource random) {
+        // Equip weapon based on type
+        List<Item> weaponList = giveRangedWeapon ? RANGED_WEAPONS : MELEE_WEAPONS;
         Item weapon = weaponList.get(random.nextInt(weaponList.size()));
         companion.setItemSlot(EquipmentSlot.MAINHAND, new ItemStack(weapon));
 
         // 50% chance for melee companions to get a shield
-        if (!combatType.isRanged() && random.nextFloat() < 0.5f) {
+        if (!giveRangedWeapon && random.nextFloat() < 0.5f) {
             companion.setItemSlot(EquipmentSlot.OFFHAND, new ItemStack(Items.SHIELD));
         }
 

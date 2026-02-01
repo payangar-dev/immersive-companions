@@ -96,7 +96,7 @@ public class CompanionRenderer extends HumanoidMobRenderer<CompanionEntity, Play
 
         // During melee swing, let vanilla HumanoidModel.setupAnim() handle the arm animation
         // Only skip for melee companions (ranged have their own arm poses that should be maintained)
-        if (entity.swinging && !entity.getCombatType().isRanged()) {
+        if (entity.swinging && !entity.canUseRangedWeapon()) {
             return;
         }
 

@@ -26,8 +26,8 @@ public class CompanionMeleeAttackGoal extends MeleeAttackGoal {
 
     @Override
     public boolean canUse() {
-        // Only melee companions use this goal
-        if (companion.getCombatType().isRanged()) {
+        // Only companions without ranged weapons use this goal
+        if (companion.canUseRangedWeapon()) {
             return false;
         }
         // Don't attack when combat is disabled (e.g., critical injury, passive stance)
@@ -39,8 +39,8 @@ public class CompanionMeleeAttackGoal extends MeleeAttackGoal {
 
     @Override
     public boolean canContinueToUse() {
-        // Stop if switched to ranged or combat disabled
-        if (companion.getCombatType().isRanged()) {
+        // Stop if switched to ranged weapon or combat disabled
+        if (companion.canUseRangedWeapon()) {
             return false;
         }
         if (companion.isCombatDisabled()) {

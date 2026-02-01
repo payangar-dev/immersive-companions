@@ -77,8 +77,8 @@ public class CompanionRangedAttackGoal extends Goal {
 
     @Override
     public boolean canUse() {
-        // Only ranged companions use this goal
-        if (!companion.getCombatType().isRanged()) {
+        // Only companions with ranged weapons use this goal
+        if (!companion.canUseRangedWeapon()) {
             return false;
         }
         // Check if combat is disabled by any condition
@@ -89,15 +89,14 @@ public class CompanionRangedAttackGoal extends Goal {
         if (target == null || !target.isAlive()) {
             return false;
         }
-        return companion.canUseRangedWeapon();
+        return true;
     }
 
     @Override
     public boolean canContinueToUse() {
         // Core prerequisites that must always be met
-        if (!companion.getCombatType().isRanged()) return false;
-        if (companion.isCombatDisabled()) return false;
         if (!companion.canUseRangedWeapon()) return false;
+        if (companion.isCombatDisabled()) return false;
 
         // Continue if target is valid, OR if still navigating to last known position
         LivingEntity target = companion.getTarget();

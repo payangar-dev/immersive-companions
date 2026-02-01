@@ -131,7 +131,7 @@ public class CompanionEntityPatch extends HumanoidMobPatch<CompanionEntity> {
         }
         this.currentCompositeMotion = this.currentLivingMotion;
 
-        if (this.original.isWeaponHolstered() || !this.original.getCombatType().isRanged())
+        if (this.original.isWeaponHolstered() || !this.original.canUseRangedWeapon())
             return;
 
         // Ranged combat animations

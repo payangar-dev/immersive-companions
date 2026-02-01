@@ -9,6 +9,7 @@ import net.minecraft.world.entity.ai.goal.Goal;
 import net.minecraft.world.entity.player.Player;
 
 import java.util.EnumSet;
+import java.util.List;
 
 /**
  * AI goal that allows companions to revive knocked-out owners when
@@ -75,8 +76,29 @@ public class CompanionReviveOwnerGoal extends Goal {
             return false;
         }
 
+        // Don't revive if another companion is already doing it
+        if (isAnotherCompanionReviving(owner)) {
+            return false;
+        }
+
         this.knockedOutOwner = owner;
         return true;
+    }
+
+    /**
+     * Checks if another companion is already reviving the same owner.
+     * This prevents multiple companions from trying to revive simultaneously.
+     */
+    private boolean isAnotherCompanionReviving(Player owner) {
+        List<CompanionEntity> nearbyCompanions = companion.level().getEntitiesOfClass(
+                CompanionEntity.class,
+                companion.getBoundingBox().inflate(32.0),
+                other -> other != companion
+                        && other.isRevivingOwner()
+                        && owner.equals(other.getOwner())
+        );
+
+        return !nearbyCompanions.isEmpty();
     }
 
     @Override

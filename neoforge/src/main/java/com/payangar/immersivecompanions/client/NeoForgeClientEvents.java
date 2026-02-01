@@ -21,7 +21,7 @@ import net.neoforged.neoforge.client.event.RegisterMenuScreensEvent;
  * NeoForge client-side event handlers.
  * Registers entity renderers and resource reload listeners.
  */
-@EventBusSubscriber(modid = ImmersiveCompanions.MOD_ID, bus = EventBusSubscriber.Bus.MOD, value = Dist.CLIENT)
+@EventBusSubscriber(modid = ImmersiveCompanions.MOD_ID, value = Dist.CLIENT)
 public class NeoForgeClientEvents {
 
     @SubscribeEvent

@@ -1278,12 +1278,17 @@ public class CompanionEntity extends PathfinderMob implements RangedAttackMob {
             return super.mobInteract(player, hand);
         }
 
+        // If player is sneaking, let them use their item instead of interacting
+        if (player.isShiftKeyDown()) {
+            return InteractionResult.PASS;
+        }
+
         // Open equipment screen for owners
         if (hasOwner()) {
             if (isOwnedBy(player) && !this.level().isClientSide) {
                 openEquipmentScreen(player);
             }
-            return InteractionResult.sidedSuccess(this.level().isClientSide);
+            return InteractionResult.SUCCESS;
         }
 
         // Only show recruitment screen for companions in the default team
@@ -1307,7 +1312,7 @@ public class CompanionEntity extends PathfinderMob implements RangedAttackMob {
             // Send packet to open recruitment screen
             ModNetworking.get().sendOpenRecruitmentScreen(serverPlayer, this.getId(), basePrice, finalPrice);
         }
-        return InteractionResult.sidedSuccess(this.level().isClientSide);
+        return InteractionResult.SUCCESS;
     }
 
     /**

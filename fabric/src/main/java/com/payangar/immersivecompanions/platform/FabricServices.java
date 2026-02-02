@@ -1,5 +1,6 @@
 package com.payangar.immersivecompanions.platform;
 
+import com.payangar.immersivecompanions.entity.CompanionEntity;
 import net.fabricmc.fabric.api.screenhandler.v1.ExtendedScreenHandlerFactory;
 import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.network.RegistryFriendlyByteBuf;
@@ -61,5 +62,11 @@ public class FabricServices implements Services {
                 return buf.readVarInt();
             }
         });
+    }
+
+    @Override
+    public boolean playGreetingEmote(CompanionEntity companion) {
+        // Epic Fight is NeoForge-only for 1.21.1
+        return false;
     }
 }

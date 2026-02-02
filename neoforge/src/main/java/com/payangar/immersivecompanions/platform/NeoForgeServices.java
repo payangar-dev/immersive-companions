@@ -1,5 +1,7 @@
 package com.payangar.immersivecompanions.platform;
 
+import com.payangar.immersivecompanions.compat.epicfight.EpicFightEmoteHelper;
+import com.payangar.immersivecompanions.entity.CompanionEntity;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.MenuProvider;
@@ -35,5 +37,13 @@ public class NeoForgeServices implements Services {
     @Override
     public void openMenu(ServerPlayer player, MenuProvider menuProvider, Consumer<RegistryFriendlyByteBuf> dataWriter) {
         player.openMenu(menuProvider, dataWriter);
+    }
+
+    @Override
+    public boolean playGreetingEmote(CompanionEntity companion) {
+        if (!ModList.get().isLoaded("epicfight")) {
+            return false;
+        }
+        return EpicFightEmoteHelper.playGreetingEmote(companion);
     }
 }

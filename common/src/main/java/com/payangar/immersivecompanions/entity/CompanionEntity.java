@@ -12,6 +12,7 @@ import com.payangar.immersivecompanions.entity.ai.CompanionFleeFromAttackerGoal;
 import com.payangar.immersivecompanions.entity.ai.CompanionFloatGoal;
 import com.payangar.immersivecompanions.entity.ai.CompanionFollowOwnerGoal;
 import com.payangar.immersivecompanions.entity.ai.CompanionGapJumpGoal;
+import com.payangar.immersivecompanions.entity.ai.CompanionGreetingGoal;
 import com.payangar.immersivecompanions.entity.ai.CompanionHurtByTargetGoal;
 import com.payangar.immersivecompanions.entity.ai.CompanionInteractionGoal;
 import com.payangar.immersivecompanions.entity.ai.CompanionMeleeAttackGoal;
@@ -68,8 +69,10 @@ import net.minecraft.world.entity.ai.navigation.PathNavigation;
 import net.minecraft.world.phys.AABB;
 
 import javax.annotation.Nullable;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
@@ -174,6 +177,15 @@ public class CompanionEntity extends PathfinderMob implements RangedAttackMob {
     /** Set of currently active conditions affecting this companion */
     private final Set<CompanionCondition> activeConditions = new HashSet<>();
 
+    /**
+     * Tracks greeting cooldowns per player UUID.
+     * Transient (not persisted) - resets when companion unloads.
+     */
+    private final Map<UUID, Long> greetingCooldowns = new HashMap<>();
+
+    /** Cooldown in ticks before a player can be greeted again (5 minutes) */
+    private static final long GREETING_COOLDOWN_TICKS = 6000L;
+
     public CompanionEntity(EntityType<? extends CompanionEntity> entityType, Level level) {
         super(entityType, level);
         setPersistenceRequired();
@@ -263,6 +275,9 @@ public class CompanionEntity extends PathfinderMob implements RangedAttackMob {
 
         // Priority 3: Door interaction (like villagers)
         this.goalSelector.addGoal(3, new OpenDoorGoal(this, true));
+
+        // Priority 5: Greeting - wave at players who approach and look at companion
+        this.goalSelector.addGoal(5, new CompanionGreetingGoal(this));
 
         // Priority 5: Village binding
         this.goalSelector.addGoal(5, new MoveTowardsRestrictionGoal(this, 1.0));
@@ -792,6 +807,10 @@ public class CompanionEntity extends PathfinderMob implements RangedAttackMob {
      * @param uuid The owner's UUID, or null to clear ownership
      */
     public void setOwnerUUID(@Nullable UUID uuid) {
+        // Clear greeting cooldowns when discharged (ownership removed)
+        if (uuid == null && this.ownerUUID != null) {
+            clearGreetingCooldowns();
+        }
         this.ownerUUID = uuid;
     }
 
@@ -827,8 +846,46 @@ public class CompanionEntity extends PathfinderMob implements RangedAttackMob {
         return this.ownerUUID != null && this.ownerUUID.equals(player.getUUID());
     }
 
+    // ========== Greeting System ==========
+
+    /**
+     * Checks if this companion can greet a specific player.
+     * Returns false if the player is on cooldown.
+     *
+     * @param player The player to check
+     * @return true if the companion can greet this player
+     */
+    public boolean canGreetPlayer(Player player) {
+        Long lastGreeting = greetingCooldowns.get(player.getUUID());
+        if (lastGreeting == null) {
+            return true;
+        }
+        long currentTime = this.level().getGameTime();
+        return (currentTime - lastGreeting) >= GREETING_COOLDOWN_TICKS;
+    }
+
+    /**
+     * Records that this companion has greeted a player, starting the cooldown.
+     *
+     * @param player The player that was greeted
+     */
+    public void recordGreeting(Player player) {
+        greetingCooldowns.put(player.getUUID(), this.level().getGameTime());
+    }
+
+    /**
+     * Clears all greeting cooldowns.
+     * Called when the companion is discharged (ownership removed).
+     */
+    public void clearGreetingCooldowns() {
+        greetingCooldowns.clear();
+    }
+
     /** Number of different recruitment messages available */
     private static final int RECRUITMENT_MESSAGE_COUNT = 12;
+
+    /** Number of different greeting messages available per category */
+    private static final int GREETING_MESSAGE_COUNT = 8;
 
     /**
      * Sends a random recruitment message to the specified player.
@@ -848,6 +905,35 @@ public class CompanionEntity extends PathfinderMob implements RangedAttackMob {
         // Create the chat message with companion's name
         net.minecraft.network.chat.Component message = net.minecraft.network.chat.Component.translatable(
                 "chat.immersivecompanions.recruited." + messageIndex,
+                companionName);
+
+        // Send only to this player (system message)
+        player.sendSystemMessage(message);
+    }
+
+    /**
+     * Sends a random greeting message to the specified player.
+     * Uses different message pools based on whether the player is the owner.
+     * Called when a companion waves at a player.
+     *
+     * @param player The player to send the message to
+     */
+    public void sendGreetingMessage(Player player) {
+        if (this.level().isClientSide) {
+            return;
+        }
+
+        // Pick a random message (1-8)
+        int messageIndex = this.getRandom().nextInt(GREETING_MESSAGE_COUNT) + 1;
+        String companionName = this.getDisplayName().getString();
+
+        // Use different message key based on ownership
+        String messageKey = isOwnedBy(player)
+                ? "chat.immersivecompanions.greeting.owner."
+                : "chat.immersivecompanions.greeting.stranger.";
+
+        net.minecraft.network.chat.Component message = net.minecraft.network.chat.Component.translatable(
+                messageKey + messageIndex,
                 companionName);
 
         // Send only to this player (system message)

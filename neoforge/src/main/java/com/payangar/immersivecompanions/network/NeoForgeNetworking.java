@@ -5,6 +5,7 @@ import com.payangar.immersivecompanions.client.gui.CompanionRecruitmentScreen;
 import com.payangar.immersivecompanions.entity.CompanionEntity;
 import com.payangar.immersivecompanions.entity.combat.CombatStance;
 import com.payangar.immersivecompanions.entity.mode.CompanionMode;
+import com.payangar.immersivecompanions.platform.NeoForgeServices;
 import com.payangar.immersivecompanions.recruitment.CompanionPricing;
 import net.minecraft.client.Minecraft;
 import net.minecraft.server.level.ServerLevel;
@@ -51,6 +52,13 @@ public class NeoForgeNetworking implements ModNetworking {
                 PurchaseCompanionPayload.TYPE,
                 PurchaseCompanionPayload.STREAM_CODEC,
                 NeoForgeNetworking::handlePurchaseCompanion
+        );
+
+        // C2S: Sync player dance state (Epic Fight emote detection)
+        registrar.playToServer(
+                SyncPlayerDancePayload.TYPE,
+                SyncPlayerDancePayload.STREAM_CODEC,
+                NeoForgeNetworking::handleSyncPlayerDance
         );
     }
 
@@ -119,6 +127,14 @@ public class NeoForgeNetworking implements ModNetworking {
                     // Send recruitment message to the player
                     companion.sendRecruitmentMessage(player);
                 }
+            }
+        });
+    }
+
+    private static void handleSyncPlayerDance(SyncPlayerDancePayload payload, IPayloadContext context) {
+        context.enqueueWork(() -> {
+            if (context.player() instanceof ServerPlayer player) {
+                NeoForgeServices.setPlayerDancing(player.getUUID(), payload.dancing());
             }
         });
     }

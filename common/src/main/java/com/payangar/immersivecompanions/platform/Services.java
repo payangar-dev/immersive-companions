@@ -1,10 +1,10 @@
 package com.payangar.immersivecompanions.platform;
 
+import com.payangar.immersivecompanions.entity.CompanionEntity;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.MenuProvider;
-
-import com.payangar.immersivecompanions.entity.CompanionEntity;
+import net.minecraft.world.entity.player.Player;
 
 import java.nio.file.Path;
 import java.util.function.Consumer;
@@ -26,11 +26,23 @@ public interface Services {
     void openMenu(ServerPlayer player, MenuProvider menuProvider, Consumer<RegistryFriendlyByteBuf> dataWriter);
 
     /**
-     * Plays a greeting emote (wave) for the companion.
-     * Only works when Epic Fight mod is installed (NeoForge).
+     * Checks if a player is currently performing the hopak dance animation.
+     * Only works with Epic Fight mod.
      *
-     * @param companion The companion to play the emote for
-     * @return true if the emote was played, false otherwise
+     * @param player The player to check
+     * @return true if the player is dancing hopak, false otherwise
+     */
+    default boolean isPlayerDancingHopak(Player player) {
+        return false;
+    }
+
+    /**
+     * Plays the greeting wave emote on a companion via Epic Fight.
+     * This is a one-shot fire-and-forget animation.
+     * Only works with Epic Fight mod on NeoForge.
+     *
+     * @param companion The companion to play the emote on
+     * @return true if the emote was played, false if Epic Fight is not available
      */
     default boolean playGreetingEmote(CompanionEntity companion) {
         return false;

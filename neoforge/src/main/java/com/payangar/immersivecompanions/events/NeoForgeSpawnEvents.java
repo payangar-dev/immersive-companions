@@ -5,6 +5,7 @@ import com.payangar.immersivecompanions.command.ModCommands;
 import com.payangar.immersivecompanions.config.ModConfig;
 import com.payangar.immersivecompanions.entity.CompanionEntity;
 import com.payangar.immersivecompanions.entity.CompanionTeleportHandler;
+import com.payangar.immersivecompanions.platform.NeoForgeServices;
 import com.payangar.immersivecompanions.spawning.CompanionSpawnLogic;
 import it.unimi.dsi.fastutil.longs.LongSet;
 import net.minecraft.core.BlockPos;
@@ -25,6 +26,7 @@ import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.event.RegisterCommandsEvent;
 import net.neoforged.neoforge.event.entity.EntityJoinLevelEvent;
 import net.neoforged.neoforge.event.entity.EntityTeleportEvent;
+import net.neoforged.neoforge.event.entity.player.PlayerEvent;
 import net.neoforged.neoforge.event.level.ChunkEvent;
 import net.neoforged.neoforge.event.server.ServerStoppedEvent;
 
@@ -107,6 +109,12 @@ public class NeoForgeSpawnEvents {
     public static void onServerStopped(ServerStoppedEvent event) {
         CompanionSpawnLogic.clearTrackedChunks();
         CompanionTeleportHandler.clear();
+        NeoForgeServices.clearAllDancingPlayers();
+    }
+
+    @SubscribeEvent
+    public static void onPlayerLoggedOut(PlayerEvent.PlayerLoggedOutEvent event) {
+        NeoForgeServices.clearDancingPlayer(event.getEntity().getUUID());
     }
 
     @SubscribeEvent

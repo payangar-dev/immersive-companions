@@ -6,6 +6,7 @@ import com.payangar.immersivecompanions.data.CompanionNames;
 import com.payangar.immersivecompanions.data.CompanionSkins;
 import com.payangar.immersivecompanions.data.SkinInfo;
 import com.payangar.immersivecompanions.entity.ai.CompanionAssistOwnerGoal;
+import com.payangar.immersivecompanions.entity.ai.CompanionDanceGoal;
 import com.payangar.immersivecompanions.entity.ai.CompanionDefendTeammatesGoal;
 import com.payangar.immersivecompanions.entity.ai.CompanionDefendVillageGoal;
 import com.payangar.immersivecompanions.entity.ai.CompanionFleeFromAttackerGoal;
@@ -16,6 +17,7 @@ import com.payangar.immersivecompanions.entity.ai.CompanionGreetingGoal;
 import com.payangar.immersivecompanions.entity.ai.CompanionHurtByTargetGoal;
 import com.payangar.immersivecompanions.entity.ai.CompanionInteractionGoal;
 import com.payangar.immersivecompanions.entity.ai.CompanionMeleeAttackGoal;
+import com.payangar.immersivecompanions.entity.ai.CompanionMimicDanceGoal;
 import com.payangar.immersivecompanions.entity.ai.CompanionNearestAttackableTargetGoal;
 import com.payangar.immersivecompanions.entity.ai.CompanionRangedAttackGoal;
 import com.payangar.immersivecompanions.entity.ai.CompanionReviveOwnerGoal;
@@ -99,6 +101,8 @@ public class CompanionEntity extends PathfinderMob implements RangedAttackMob {
             CompanionEntity.class, EntityDataSerializers.STRING);
     private static final EntityDataAccessor<Boolean> DATA_WEAPON_HOLSTERED = SynchedEntityData.defineId(
             CompanionEntity.class, EntityDataSerializers.BOOLEAN);
+    private static final EntityDataAccessor<Boolean> DATA_DANCING = SynchedEntityData.defineId(
+            CompanionEntity.class, EntityDataSerializers.BOOLEAN);
 
     /** Default team for village-spawned companions */
     public static final String DEFAULT_TEAM = "village_guard";
@@ -161,6 +165,14 @@ public class CompanionEntity extends PathfinderMob implements RangedAttackMob {
      * Set by CompanionReviveOwnerGoal to prevent tick() from overriding crouch state.
      */
     private boolean isRevivingOwner = false;
+
+    /**
+     * Optional listener for animation events (e.g., Epic Fight emotes).
+     * Set by CompanionEntityPatch when Epic Fight is loaded.
+     * Null when no animation system is available (Fabric, or NeoForge without Epic Fight).
+     */
+    @Nullable
+    private CompanionAnimationListener animationListener = null;
 
     /** UUID of the player who owns this companion (null if unbought) */
     @Nullable
@@ -241,6 +253,7 @@ public class CompanionEntity extends PathfinderMob implements RangedAttackMob {
         builder.define(DATA_MODE_ID, CompanionMode.WANDER.getId());
         builder.define(DATA_COMBAT_STANCE, CombatStance.AGGRESSIVE.getId());
         builder.define(DATA_WEAPON_HOLSTERED, true); // Default: weapon holstered
+        builder.define(DATA_DANCING, false);
     }
 
     @Override
@@ -278,6 +291,12 @@ public class CompanionEntity extends PathfinderMob implements RangedAttackMob {
 
         // Priority 5: Greeting - wave at players who approach and look at companion
         this.goalSelector.addGoal(5, new CompanionGreetingGoal(this));
+
+        // Priority 5: Dancing - dance around playing jukeboxes (WANDER mode)
+        this.goalSelector.addGoal(5, new CompanionDanceGoal(this));
+
+        // Priority 5: Mimic dancing - mirror owner's hopak dance (FOLLOW mode, Epic Fight only)
+        this.goalSelector.addGoal(5, new CompanionMimicDanceGoal(this));
 
         // Priority 5: Village binding
         this.goalSelector.addGoal(5, new MoveTowardsRestrictionGoal(this, 1.0));
@@ -554,6 +573,43 @@ public class CompanionEntity extends PathfinderMob implements RangedAttackMob {
      */
     public void setRevivingOwner(boolean reviving) {
         this.isRevivingOwner = reviving;
+    }
+
+    /**
+     * Checks if the companion is currently dancing.
+     * Synced via EntityDataAccessor so it works on both client and server.
+     */
+    public boolean isDancing() {
+        return this.entityData.get(DATA_DANCING);
+    }
+
+    /**
+     * Sets whether the companion is dancing.
+     * Synced to client via EntityDataAccessor. Fires animation listener callbacks
+     * on state transitions.
+     *
+     * @param dancing true to start dancing, false to stop
+     */
+    public void setDancing(boolean dancing) {
+        boolean wasDancing = isDancing();
+        this.entityData.set(DATA_DANCING, dancing);
+        if (dancing != wasDancing && animationListener != null) {
+            if (dancing) {
+                animationListener.onStartDancing(this);
+            } else {
+                animationListener.onStopDancing(this);
+            }
+        }
+    }
+
+    /**
+     * Sets the animation listener for this companion.
+     * Called by CompanionEntityPatch during construction.
+     *
+     * @param listener The listener, or null to clear
+     */
+    public void setAnimationListener(@Nullable CompanionAnimationListener listener) {
+        this.animationListener = listener;
     }
 
     /**
@@ -1258,16 +1314,18 @@ public class CompanionEntity extends PathfinderMob implements RangedAttackMob {
                 stopSprinting();
             }
 
-            // Crouch when: owner is crouching (follow mode), critically injured, or reviving owner
-                if ((this.getMode() == CompanionMode.FOLLOW && this.getOwner().isCrouching()) || this.isCriticallyInjured() || this.isRevivingOwner()) {
-                    if (!this.isCrouching()) {
-                        startSneaking();
-                    }
-                } else {
-                    if (this.isCrouching()) {
-                        stopSneaking();
-                    }
+            // Crouch when: owner is crouching (follow mode), critically injured, reviving owner, or dancing
+            if ((this.getMode() == CompanionMode.FOLLOW && this.getOwner() != null && this.getOwner().isCrouching())
+                    || this.isCriticallyInjured() || this.isRevivingOwner() || this.isDancing()) {
+                // Don't force crouch when dancing - let the goal control it
+                if (!this.isDancing() && !this.isCrouching()) {
+                    startSneaking();
                 }
+            } else {
+                if (this.isCrouching()) {
+                    stopSneaking();
+                }
+            }
 
             // Update weapon holster state based on target presence
             updateWeaponHolsterState();

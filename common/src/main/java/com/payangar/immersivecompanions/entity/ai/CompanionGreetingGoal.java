@@ -65,7 +65,7 @@ public class CompanionGreetingGoal extends Goal {
         // Stop any current navigation
         companion.getNavigation().stop();
 
-        // Play the greeting emote via platform services
+        // Play the greeting emote via platform services (Epic Fight on NeoForge)
         Services.get().playGreetingEmote(companion);
 
         // Send greeting message to player

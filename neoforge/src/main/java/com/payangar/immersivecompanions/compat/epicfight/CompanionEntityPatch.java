@@ -1,5 +1,6 @@
 package com.payangar.immersivecompanions.compat.epicfight;
 
+import com.payangar.immersivecompanions.entity.CompanionAnimationListener;
 import com.payangar.immersivecompanions.entity.CompanionEntity;
 import net.minecraft.core.Holder;
 import net.minecraft.world.InteractionHand;
@@ -35,15 +36,39 @@ import yesman.epicfight.world.entity.ai.goal.TargetChasingGoal;
  * Ranged weapon animations (bow/crossbow) come from the weapon capability
  * system.
  */
-public class CompanionEntityPatch extends HumanoidMobPatch<CompanionEntity> {
+public class CompanionEntityPatch extends HumanoidMobPatch<CompanionEntity>
+        implements CompanionAnimationListener {
 
     /**
      * Tracks the previous holster state to detect changes and update animations.
      */
     private boolean wasHolstered = true;
 
+    /**
+     * Tracks the previous dancing state so we can cancel the HOPAK emote
+     * when the companion stops dancing while idle (no movement to trigger
+     * a living motion swap).
+     */
+    private boolean wasDancing = false;
+
     public CompanionEntityPatch(CompanionEntity original) {
         super(original, Factions.VILLAGER); // Allies with villagers, hostile to undead
+        original.setAnimationListener(this);
+    }
+
+    // ========== CompanionAnimationListener ==========
+
+    @Override
+    public void onStartDancing(CompanionEntity companion) {
+        if (!companion.level().isClientSide()) {
+            this.playAnimationSynchronized(Animations.BIPED_HOPAK, 0.0F);
+        }
+    }
+
+    @Override
+    public void onStopDancing(CompanionEntity companion) {
+        // No action needed — updateMotion() will resume normal motion,
+        // which triggers a living animation swap that replaces the emote
     }
 
     @Override
@@ -101,6 +126,37 @@ public class CompanionEntityPatch extends HumanoidMobPatch<CompanionEntity> {
     public void updateMotion(boolean considerInaction) {
         // Handle weapon holstering when not in combat (Epic Fight uses weapon on back)
         updateWeaponHolstering();
+
+        // Protect emote animations from being overridden by living motion.
+        // isDancing(): synced via EntityDataAccessor — works on client for continuous dance emotes.
+        // isPlaying(WAVE_HAND): checks animator directly — works on client for one-shot wave emotes.
+        if (this.original.isDancing()) {
+            this.wasDancing = true;
+            // Client-side recovery: the animation packet and EntityDataAccessor sync can
+            // arrive in different ticks. If the data synced after the packet's animation was
+            // cancelled by a living motion swap, HOPAK is dead but isDancing() is true.
+            // Re-trigger it locally — the synced data accessor is the authority, no packet needed.
+            if (!this.getAnimator().isPlaying(Animations.BIPED_HOPAK)) {
+                this.getAnimator().playAnimation(Animations.BIPED_HOPAK, 0.0F);
+            }
+            this.currentLivingMotion = LivingMotions.INACTION;
+            this.currentCompositeMotion = LivingMotions.INACTION;
+            return;
+        }
+        if (this.wasDancing) {
+            this.wasDancing = false;
+            // HOPAK is a static/emote animation on a separate layer from living motions.
+            // When the companion stops dancing while idle (no movement), the living motion
+            // swap (INACTION → IDLE) doesn't cancel it. Force BIPED_IDLE to replace it.
+            if (this.getAnimator().isPlaying(Animations.BIPED_HOPAK)) {
+                this.getAnimator().playAnimation(Animations.BIPED_IDLE, 0.0F);
+            }
+        }
+        if (this.getAnimator().isPlaying(Animations.BIPED_WAVE_HAND)) {
+            this.currentLivingMotion = LivingMotions.INACTION;
+            this.currentCompositeMotion = LivingMotions.INACTION;
+            return;
+        }
 
         if (this.original.isDeadOrDying()) {
             this.currentLivingMotion = LivingMotions.DEATH;

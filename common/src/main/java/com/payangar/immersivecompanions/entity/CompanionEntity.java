@@ -18,6 +18,7 @@ import com.payangar.immersivecompanions.entity.ai.CompanionHurtByTargetGoal;
 import com.payangar.immersivecompanions.entity.ai.CompanionInteractionGoal;
 import com.payangar.immersivecompanions.entity.ai.CompanionMeleeAttackGoal;
 import com.payangar.immersivecompanions.entity.ai.CompanionMimicDanceGoal;
+import com.payangar.immersivecompanions.entity.ai.CompanionMountGoal;
 import com.payangar.immersivecompanions.entity.ai.CompanionNearestAttackableTargetGoal;
 import com.payangar.immersivecompanions.entity.ai.CompanionRangedAttackGoal;
 import com.payangar.immersivecompanions.entity.ai.CompanionReviveOwnerGoal;
@@ -288,6 +289,9 @@ public class CompanionEntity extends PathfinderMob implements RangedAttackMob {
 
         // Priority 3: Door interaction (like villagers)
         this.goalSelector.addGoal(3, new OpenDoorGoal(this, true));
+
+        // Priority 4: Mount horses when owner is mounted (FOLLOW mode)
+        this.goalSelector.addGoal(4, new CompanionMountGoal(this));
 
         // Priority 5: Greeting - wave at players who approach and look at companion
         this.goalSelector.addGoal(5, new CompanionGreetingGoal(this));

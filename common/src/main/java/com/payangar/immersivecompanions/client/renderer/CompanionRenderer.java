@@ -54,6 +54,13 @@ public class CompanionRenderer extends HumanoidMobRenderer<CompanionEntity, Play
     @Override
     public void render(CompanionEntity entity, float entityYaw, float partialTicks,
                        PoseStack poseStack, MultiBufferSource buffer, int packedLight) {
+        // Adjust Y position when riding to compensate for render scale.
+        // The visual model is shorter than the hitbox (scaled by RENDER_SCALE),
+        // so we translate down to sit properly on the mount.
+        if (entity.isPassenger()) {
+            poseStack.translate(0.0, -0.5, 0.0);
+        }
+
         // Swap model based on skin info (respects _slim/_wide suffix or folder default)
         SkinInfo skinInfo = entity.getSkinInfo();
         this.model = skinInfo.slim() ? slimModel : normalModel;

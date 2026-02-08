@@ -73,6 +73,11 @@ public class CompanionMountGoal extends Goal {
             return false;
         }
 
+        // Critically injured companions cannot mount horses
+        if (companion.isCriticallyInjured()) {
+            return false;
+        }
+
         // Must have an owner
         this.owner = companion.getOwner();
         if (owner == null || !owner.isAlive()) {
@@ -85,7 +90,7 @@ public class CompanionMountGoal extends Goal {
         }
 
         // If companion is already mounted, continue with this goal
-        if (companion.isPassenger() && companion.getVehicle() instanceof AbstractHorse) {
+        if (companion.isMountedOnHorse()) {
             return true;
         }
 
@@ -146,9 +151,20 @@ public class CompanionMountGoal extends Goal {
 
     @Override
     public void stop() {
-        // Dismount if still mounted
-        if (companion.isPassenger()) {
+        // Only dismount if the riding context has actually ended.
+        // If the owner is still mounted and we're in FOLLOW mode, another goal
+        // (e.g. combat) just interrupted us - stay on the horse so we can fight
+        // from horseback.
+        boolean shouldStayMounted = owner != null
+                && owner.getVehicle() instanceof AbstractHorse
+                && companion.getMode() == CompanionMode.FOLLOW;
+
+        if (!shouldStayMounted && companion.isPassenger()) {
             companion.stopRiding();
+        }
+
+        if (companion.isSprinting()) {
+            companion.stopSprinting();
         }
 
         this.owner = null;
@@ -167,6 +183,9 @@ public class CompanionMountGoal extends Goal {
         if (!isMounted && companion.isPassenger() && companion.getVehicle() instanceof AbstractHorse) {
             isMounted = true;
             navigation.stop();
+            if (companion.isSprinting()) {
+                companion.stopSprinting();
+            }
         }
 
         if (isMounted) {
@@ -199,6 +218,11 @@ public class CompanionMountGoal extends Goal {
         if (distanceToHorse < MOUNT_DISTANCE * MOUNT_DISTANCE) {
             companion.startRiding(targetHorse);
             return;
+        }
+
+        // Sprint to horse so we reach it before the owner rides away
+        if (!companion.isSprinting()) {
+            companion.startSprinting();
         }
 
         // Pathfind to horse

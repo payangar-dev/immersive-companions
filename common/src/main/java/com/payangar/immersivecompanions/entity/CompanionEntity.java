@@ -69,6 +69,8 @@ import net.minecraft.world.MenuProvider;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.ServerLevelAccessor;
 import net.minecraft.world.entity.ai.navigation.PathNavigation;
+import net.minecraft.world.entity.animal.horse.AbstractHorse;
+import net.minecraft.world.entity.TamableAnimal;
 import net.minecraft.world.phys.AABB;
 
 import javax.annotation.Nullable;
@@ -422,6 +424,43 @@ public class CompanionEntity extends PathfinderMob implements RangedAttackMob {
     }
 
     /**
+     * Checks if an entity is a tamed animal.
+     * Covers both TamableAnimal (wolves, cats, parrots) and AbstractHorse
+     * (horses, donkeys, mules, camels, llamas).
+     *
+     * @param entity The entity to check
+     * @return true if the entity is a tamed animal
+     */
+    public static boolean isTamedAnimal(LivingEntity entity) {
+        if (entity instanceof TamableAnimal tameable) {
+            return tameable.isTame();
+        }
+        if (entity instanceof AbstractHorse horse) {
+            return horse.isTamed();
+        }
+        return false;
+    }
+
+    /**
+     * Checks if this companion is currently riding a horse.
+     *
+     * @return true if the companion is a passenger on an AbstractHorse
+     */
+    public boolean isMountedOnHorse() {
+        return isPassenger() && getVehicle() instanceof AbstractHorse;
+    }
+
+    /**
+     * Gets the horse this companion is currently riding, if any.
+     *
+     * @return The mounted horse, or null if not riding a horse
+     */
+    @Nullable
+    public AbstractHorse getMountedHorse() {
+        return (getVehicle() instanceof AbstractHorse horse) ? horse : null;
+    }
+
+    /**
      * Sets the critically injured state by adding/removing the condition.
      * This method delegates to the condition system.
      *
@@ -433,6 +472,10 @@ public class CompanionEntity extends PathfinderMob implements RangedAttackMob {
 
         if (injured) {
             addCondition(CriticalInjuryCondition.INSTANCE);
+            // Too injured to ride - force dismount immediately
+            if (isPassenger()) {
+                stopRiding();
+            }
         } else {
             removeCondition(CriticalInjuryCondition.INSTANCE);
         }

@@ -5,7 +5,9 @@ import net.minecraft.world.InteractionHand;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.ai.goal.Goal;
 import net.minecraft.world.entity.animal.IronGolem;
+import net.minecraft.world.entity.animal.horse.AbstractHorse;
 import net.minecraft.world.entity.npc.AbstractVillager;
+import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.CrossbowItem;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
@@ -122,6 +124,11 @@ public class CompanionRangedAttackGoal extends Goal {
         if (companion.isSprinting()) {
             companion.stopSprinting();
         }
+        // Stop horse navigation if we were controlling it
+        AbstractHorse horse = companion.getMountedHorse();
+        if (horse != null) {
+            horse.getNavigation().stop();
+        }
     }
 
     @Override
@@ -146,32 +153,57 @@ public class CompanionRangedAttackGoal extends Goal {
         boolean tooFar = distSq > attackRadiusSqr;
         boolean tooClose = distSq < minAttackRadiusSqr;
 
-        // Handle movement - approach, retreat, or strafe
-        if (tooFar || !canSee) {
-            // Move toward target if too far or can't see
-            companion.getNavigation().moveTo(target, speedModifier);
-            resetChargingState();
-            // Sprint when approaching target
-            if (!companion.isSprinting()) {
-                companion.startSprinting();
-            }
-        } else if (tooClose) {
-            // Retreat! Target is too close - move backwards while facing target
-            // Set look direction first, then use strafe to move backwards without turning
-            companion.getLookControl().setLookAt(target, 30.0F, 30.0F);
-            companion.getMoveControl().strafe(-1.0F * (float) speedModifier * 1.2F, 0.0F);
-            // Stop sprinting when retreating
-            if (companion.isSprinting()) {
-                companion.stopSprinting();
+        // Branch movement logic: mounted vs on-foot
+        AbstractHorse horse = companion.getMountedHorse();
+        if (horse != null) {
+            // --- Mounted movement ---
+            // Check if owner dismounted - if so, dismount companion too
+            Player owner = companion.getOwner();
+            if (owner != null && !(owner.getVehicle() instanceof AbstractHorse)) {
+                horse.getNavigation().stop();
+                companion.stopRiding();
+                // Fall through to charging/shooting logic on foot
+            } else if (tooFar || !canSee) {
+                // Approach target on horseback
+                horse.getNavigation().moveTo(target, 2.5);
+                resetChargingState();
+            } else if (tooClose) {
+                // Back away on horseback - navigate to a point away from target
+                Vec3 awayDir = companion.position().subtract(target.position()).normalize();
+                Vec3 retreatPos = companion.position().add(awayDir.scale(minAttackRadius));
+                horse.getNavigation().moveTo(retreatPos.x, retreatPos.y, retreatPos.z, 2.5);
+            } else {
+                // In range - stop horse and shoot (horses can't strafe)
+                horse.getNavigation().stop();
+                companion.getLookControl().setLookAt(target, 30.0F, 30.0F);
             }
         } else {
-            // In optimal range - strafe while attacking
-            companion.getNavigation().stop();
-            handleStrafing(distSq);
-            companion.getLookControl().setLookAt(target, 30.0F, 30.0F);
-            // Stop sprinting when strafing in range
-            if (companion.isSprinting()) {
-                companion.stopSprinting();
+            // --- Ground movement (original behavior) ---
+            if (tooFar || !canSee) {
+                // Move toward target if too far or can't see
+                companion.getNavigation().moveTo(target, speedModifier);
+                resetChargingState();
+                // Sprint when approaching target
+                if (!companion.isSprinting()) {
+                    companion.startSprinting();
+                }
+            } else if (tooClose) {
+                // Retreat! Target is too close - move backwards while facing target
+                companion.getLookControl().setLookAt(target, 30.0F, 30.0F);
+                companion.getMoveControl().strafe(-1.0F * (float) speedModifier * 1.2F, 0.0F);
+                // Stop sprinting when retreating
+                if (companion.isSprinting()) {
+                    companion.stopSprinting();
+                }
+            } else {
+                // In optimal range - strafe while attacking
+                companion.getNavigation().stop();
+                handleStrafing(distSq);
+                companion.getLookControl().setLookAt(target, 30.0F, 30.0F);
+                // Stop sprinting when strafing in range
+                if (companion.isSprinting()) {
+                    companion.stopSprinting();
+                }
             }
         }
 

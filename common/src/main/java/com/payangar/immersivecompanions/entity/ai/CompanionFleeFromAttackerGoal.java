@@ -5,6 +5,7 @@ import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.PathfinderMob;
 import net.minecraft.world.entity.ai.goal.Goal;
 import net.minecraft.world.entity.ai.util.DefaultRandomPos;
+import net.minecraft.world.entity.animal.horse.AbstractHorse;
 import net.minecraft.world.phys.Vec3;
 
 import javax.annotation.Nullable;
@@ -87,8 +88,11 @@ public class CompanionFleeFromAttackerGoal extends Goal {
     @Override
     public void start() {
         this.pathRecalcTimer = 0;
-        // Start sprinting when fleeing (will be blocked if critically injured)
-        companion.startSprinting();
+        // Start sprinting when fleeing on foot (will be blocked if critically injured)
+        // Don't sprint when mounted - horse handles speed
+        if (!companion.isMountedOnHorse()) {
+            companion.startSprinting();
+        }
         fleeFromAttacker();
     }
 
@@ -107,10 +111,16 @@ public class CompanionFleeFromAttackerGoal extends Goal {
         if (companion.isSprinting()) {
             companion.stopSprinting();
         }
+        // Stop horse navigation if we were controlling it
+        AbstractHorse horse = companion.getMountedHorse();
+        if (horse != null) {
+            horse.getNavigation().stop();
+        }
     }
 
     /**
      * Calculates and sets a path away from the attacker.
+     * When mounted, navigates the horse instead of the companion.
      */
     private void fleeFromAttacker() {
         if (attacker == null) {
@@ -124,7 +134,15 @@ public class CompanionFleeFromAttackerGoal extends Goal {
                 attacker.position()
         );
 
-        if (fleePos != null) {
+        if (fleePos == null) {
+            return;
+        }
+
+        AbstractHorse horse = companion.getMountedHorse();
+        if (horse != null) {
+            // Flee on horseback - faster escape
+            horse.getNavigation().moveTo(fleePos.x, fleePos.y, fleePos.z, 2.5);
+        } else {
             companion.getNavigation().moveTo(fleePos.x, fleePos.y, fleePos.z, FLEE_SPEED);
         }
     }

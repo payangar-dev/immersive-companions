@@ -125,6 +125,11 @@ public class CompanionAssistOwnerGoal extends TargetGoal {
             return null;
         }
 
+        // Don't target tamed animals (horses, wolves, cats, etc.)
+        if (CompanionEntity.isTamedAnimal(ownerLastHurt)) {
+            return null;
+        }
+
         // Verify we can actually target this entity
         if (!targetConditions.test(companion, ownerLastHurt)) {
             return null;

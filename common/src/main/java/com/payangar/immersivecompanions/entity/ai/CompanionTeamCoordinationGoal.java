@@ -5,6 +5,8 @@ import com.payangar.immersivecompanions.entity.CompanionEntity;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.ai.goal.target.TargetGoal;
 import net.minecraft.world.entity.ai.targeting.TargetingConditions;
+import net.minecraft.world.entity.animal.horse.AbstractHorse;
+import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.phys.AABB;
 
 import javax.annotation.Nullable;
@@ -94,7 +96,7 @@ public class CompanionTeamCoordinationGoal extends TargetGoal {
     }
 
     /**
-     * Finds an entity that is attacking a same-team companion.
+     * Finds an entity that is attacking a same-team companion, their mount, or the owner's mount.
      * @return The attacker to target, or null if none found
      */
     @Nullable
@@ -107,36 +109,45 @@ public class CompanionTeamCoordinationGoal extends TargetGoal {
         );
 
         for (CompanionEntity teammate : teammates) {
-            LivingEntity attacker = teammate.getLastHurtByMob();
-            if (attacker == null || !attacker.isAlive()) {
-                continue;
-            }
+            LivingEntity attacker = getRecentAttacker(teammate);
+            if (attacker != null) return attacker;
 
-            // Check if the attack was recent
-            int timeSinceHurt = teammate.tickCount - teammate.getLastHurtByMobTimestamp();
-            if (timeSinceHurt > RECENT_HURT_THRESHOLD) {
-                continue;
+            // Also check teammate's mount
+            AbstractHorse mount = teammate.getMountedHorse();
+            if (mount != null) {
+                attacker = getRecentAttacker(mount);
+                if (attacker != null) return attacker;
             }
+        }
 
-            // Don't target same-team companions
-            if (companion.isOnSameTeam(attacker)) {
-                continue;
-            }
-
-            // Don't target owner
-            if (attacker.equals(companion.getOwner())) {
-                continue;
-            }
-
-            // Verify we can actually target this entity
-            if (!targetConditions.test(companion, attacker)) {
-                continue;
-            }
-
-            return attacker;
+        // Check owner's mount
+        Player owner = companion.getOwner();
+        if (owner != null && owner.getVehicle() instanceof AbstractHorse ownerHorse) {
+            LivingEntity attacker = getRecentAttacker(ownerHorse);
+            if (attacker != null) return attacker;
         }
 
         return null;
+    }
+
+    /**
+     * Returns the recent attacker of the given entity, if valid (alive, recent,
+     * not the owner, not a same-team companion, not a tamed animal, and targetable).
+     */
+    @Nullable
+    private LivingEntity getRecentAttacker(LivingEntity entity) {
+        LivingEntity attacker = entity.getLastHurtByMob();
+        if (attacker == null || !attacker.isAlive()) return null;
+
+        int timeSinceHurt = entity.tickCount - entity.getLastHurtByMobTimestamp();
+        if (timeSinceHurt > RECENT_HURT_THRESHOLD) return null;
+
+        if (companion.isOnSameTeam(attacker)) return null;
+        if (attacker.equals(companion.getOwner())) return null;
+        if (CompanionEntity.isTamedAnimal(attacker)) return null;
+        if (!targetConditions.test(companion, attacker)) return null;
+
+        return attacker;
     }
 
     /**
@@ -170,6 +181,11 @@ public class CompanionTeamCoordinationGoal extends TargetGoal {
 
             // Loop prevention: don't assist someone targeting us
             if (target == companion) {
+                continue;
+            }
+
+            // Don't target tamed animals (horses, wolves, cats, etc.)
+            if (CompanionEntity.isTamedAnimal(target)) {
                 continue;
             }
 

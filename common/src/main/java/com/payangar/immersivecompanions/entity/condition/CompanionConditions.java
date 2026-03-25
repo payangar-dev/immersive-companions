@@ -20,10 +20,8 @@ public class CompanionConditions {
     /** Critical injury condition - applied when health drops below threshold */
     public static final CompanionCondition CRITICAL_INJURY = register(CriticalInjuryCondition.INSTANCE);
 
-    // Future conditions can be added here:
-    // public static final CompanionCondition POISONED = register(PoisonedCondition.INSTANCE);
-    // public static final CompanionCondition STUNNED = register(StunnedCondition.INSTANCE);
-    // public static final CompanionCondition EXHAUSTED = register(ExhaustedCondition.INSTANCE);
+    /** Agony condition - applied when a companion would die, entering a downed state */
+    public static final CompanionCondition AGONY = register(AgonyCondition.INSTANCE);
 
     // ========== Registry Methods ==========
 

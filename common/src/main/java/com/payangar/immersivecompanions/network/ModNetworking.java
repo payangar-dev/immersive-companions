@@ -35,6 +35,14 @@ public interface ModNetworking {
     void sendPurchaseCompanion(int entityId);
 
     /**
+     * Sends a revive companion tick packet from client to server.
+     * Called each tick while the player holds right-click on an agonizing companion.
+     *
+     * @param entityId The entity ID of the companion being revived
+     */
+    void sendReviveCompanionTick(int entityId);
+
+    /**
      * Gets the networking instance.
      */
     static ModNetworking get() {

@@ -11,6 +11,14 @@
     "config.immersivecompanions.enableCompanionRevival.desc": "Allow companions to revive knocked-out owners (requires Hardcore Revival mod)",
     "config.immersivecompanions.companionRevivalTicks": "Revival Time (ticks)",
     "config.immersivecompanions.companionRevivalTicks.desc": "How long companions take to revive their owner. 60 ticks = 3 seconds. Default: 60",
+    "config.immersivecompanions.enableAgony": "Enable Agony System",
+    "config.immersivecompanions.enableAgony.desc": "When enabled, companions enter a downed state instead of dying immediately. They can be revived by holding right-click.",
+    "config.immersivecompanions.agonyDurationTicks": "Agony Duration (ticks)",
+    "config.immersivecompanions.agonyDurationTicks.desc": "How long a companion survives in agony before dying. 1200 ticks = 60 seconds. Default: 1200",
+    "config.immersivecompanions.agonyHitsBeforeDeath": "Agony Hits Before Death",
+    "config.immersivecompanions.agonyHitsBeforeDeath.desc": "Number of hits an agonizing companion can take before dying. Damage amount doesn't matter. Default: 3",
+    "config.immersivecompanions.reviveDurationTicks": "Revive Duration (ticks)",
+    "config.immersivecompanions.reviveDurationTicks.desc": "How long a player must hold right-click to revive an agonizing companion. 100 ticks = 5 seconds. Default: 100",
 
     "gui.immersivecompanions.recruitment.title": "Recruit Companion",
     "gui.immersivecompanions.recruitment.dialogue": "I'll guard your back if you make it worth my while...",
@@ -48,6 +56,27 @@
     "chat.immersivecompanions.hurt_by_mob.3": "<%s> I could use some backup!",
     "chat.immersivecompanions.hurt_by_mob.4": "<%s> They're hitting hard! Help me!",
     "chat.immersivecompanions.hurt_by_mob.5": "<%s> I'm in trouble here!",
+
+    "chat.immersivecompanions.agony.hurt_by_ally.1": "<%s> Why... I trusted you...",
+    "chat.immersivecompanions.agony.hurt_by_ally.2": "<%s> You... you did this to me...",
+    "chat.immersivecompanions.agony.hurt_by_ally.3": "<%s> After everything... why?",
+    "chat.immersivecompanions.agony.hurt_by_ally.4": "<%s> I served you loyally... and this is how it ends?",
+    "chat.immersivecompanions.agony.hurt_by_ally.5": "<%s> Was I... not good enough?",
+
+    "chat.immersivecompanions.agony.hurt_by_enemy_player.1": "<%s> Please... don't finish me off...",
+    "chat.immersivecompanions.agony.hurt_by_enemy_player.2": "<%s> I'm done... just leave me be...",
+    "chat.immersivecompanions.agony.hurt_by_enemy_player.3": "<%s> You've won... spare me...",
+    "chat.immersivecompanions.agony.hurt_by_enemy_player.4": "<%s> No more... I beg you...",
+    "chat.immersivecompanions.agony.hurt_by_enemy_player.5": "<%s> I can't fight anymore... have mercy...",
+
+    "chat.immersivecompanions.agony.hurt_by_mob.1": "<%s> I'm going down! Someone help me!",
+    "chat.immersivecompanions.agony.hurt_by_mob.2": "<%s> I can't hold on... please, anyone!",
+    "chat.immersivecompanions.agony.hurt_by_mob.3": "<%s> Everything's going dark... help...",
+    "chat.immersivecompanions.agony.hurt_by_mob.4": "<%s> Don't leave me here to die!",
+    "chat.immersivecompanions.agony.hurt_by_mob.5": "<%s> I need help... I can't get up...",
+
+    "action.immersivecompanions.reviving": "Reviving... %s%%",
+    "action.immersivecompanions.revive_hint": "Hold %s to revive",
 
     "chat.immersivecompanions.greeting.owner.1": "<%s> Welcome back, boss!",
     "chat.immersivecompanions.greeting.owner.2": "<%s> Good to see you again!",

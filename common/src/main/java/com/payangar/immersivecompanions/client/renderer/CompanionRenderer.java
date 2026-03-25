@@ -65,6 +65,15 @@ public class CompanionRenderer extends HumanoidMobRenderer<CompanionEntity, Play
         SkinInfo skinInfo = entity.getSkinInfo();
         this.model = skinInfo.slim() ? slimModel : normalModel;
 
+        // When agonizing, override crouching and arm poses
+        if (entity.isAgonizing()) {
+            this.model.crouching = false;
+            this.model.rightArmPose = HumanoidModel.ArmPose.EMPTY;
+            this.model.leftArmPose = HumanoidModel.ArmPose.EMPTY;
+            super.render(entity, entityYaw, partialTicks, poseStack, buffer, packedLight);
+            return;
+        }
+
         // Set crouching state - required for vanilla rendering since HumanoidMobRenderer
         // doesn't set this for non-player entities (unlike PlayerRenderer)
         this.model.crouching = entity.isCrouching();
@@ -142,6 +151,19 @@ public class CompanionRenderer extends HumanoidMobRenderer<CompanionEntity, Play
     @Override
     public ResourceLocation getTextureLocation(CompanionEntity entity) {
         return entity.getSkinTexture();
+    }
+
+    @Override
+    protected void setupRotations(CompanionEntity entity, PoseStack poseStack, float bob,
+                                   float yBodyRot, float partialTick, float scale) {
+        if (entity.isAgonizing()) {
+            // Apply only yaw rotation, then tilt forward to lie face-down
+            poseStack.mulPose(com.mojang.math.Axis.YP.rotationDegrees(180.0F - yBodyRot));
+            poseStack.mulPose(com.mojang.math.Axis.XP.rotationDegrees(-90.0F));
+            poseStack.translate(0.0F, -1.0F, 0.1F);
+            return;
+        }
+        super.setupRotations(entity, poseStack, bob, yBodyRot, partialTick, scale);
     }
 
     @Override

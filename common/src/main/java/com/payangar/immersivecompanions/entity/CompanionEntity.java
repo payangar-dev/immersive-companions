@@ -28,6 +28,7 @@ import com.payangar.immersivecompanions.entity.ai.CompanionWaterAvoidingRandomSt
 import com.payangar.immersivecompanions.entity.ai.pathfinding.CompanionGroundPathNavigation;
 import com.payangar.immersivecompanions.entity.combat.CombatStance;
 import com.payangar.immersivecompanions.entity.condition.ActionType;
+import com.payangar.immersivecompanions.entity.condition.AgonyCondition;
 import com.payangar.immersivecompanions.entity.condition.CompanionCondition;
 import com.payangar.immersivecompanions.entity.condition.CriticalInjuryCondition;
 import com.payangar.immersivecompanions.entity.mode.CompanionMode;
@@ -106,6 +107,8 @@ public class CompanionEntity extends PathfinderMob implements RangedAttackMob {
             CompanionEntity.class, EntityDataSerializers.BOOLEAN);
     private static final EntityDataAccessor<Boolean> DATA_DANCING = SynchedEntityData.defineId(
             CompanionEntity.class, EntityDataSerializers.BOOLEAN);
+    private static final EntityDataAccessor<Boolean> DATA_AGONIZING = SynchedEntityData.defineId(
+            CompanionEntity.class, EntityDataSerializers.BOOLEAN);
 
     /** Default team for village-spawned companions */
     public static final String DEFAULT_TEAM = "village_guard";
@@ -168,6 +171,22 @@ public class CompanionEntity extends PathfinderMob implements RangedAttackMob {
      * Set by CompanionReviveOwnerGoal to prevent tick() from overriding crouch state.
      */
     private boolean isRevivingOwner = false;
+
+    /** Ticks remaining before agony death. Server-side only. */
+    private int agonyTicksRemaining = 0;
+
+    /** Hits received while agonizing. Server-side only. */
+    private int agonyHitsTaken = 0;
+
+    /** UUID of the player currently reviving this companion. Server-side only. */
+    @Nullable
+    private UUID revivingPlayerUUID = null;
+
+    /** Ticks of revive progress accumulated. Server-side only. */
+    private int reviveProgressTicks = 0;
+
+    /** Ticks since last revive packet was received. Used to detect release. Server-side only. */
+    private int ticksSinceLastRevivePacket = Integer.MAX_VALUE;
 
     /**
      * Optional listener for animation events (e.g., Epic Fight emotes).
@@ -257,6 +276,7 @@ public class CompanionEntity extends PathfinderMob implements RangedAttackMob {
         builder.define(DATA_COMBAT_STANCE, CombatStance.AGGRESSIVE.getId());
         builder.define(DATA_WEAPON_HOLSTERED, true); // Default: weapon holstered
         builder.define(DATA_DANCING, false);
+        builder.define(DATA_AGONIZING, false);
     }
 
     @Override
@@ -481,6 +501,108 @@ public class CompanionEntity extends PathfinderMob implements RangedAttackMob {
         }
     }
 
+    // ========== Agony System ==========
+
+    /**
+     * Checks if this companion is in the agony (downed) state.
+     *
+     * @return true if the companion is agonizing
+     */
+    public boolean isAgonizing() {
+        return this.entityData.get(DATA_AGONIZING);
+    }
+
+    /**
+     * Gets the remaining agony ticks before death. Server-side only.
+     *
+     * @return remaining ticks
+     */
+    public int getAgonyTicksRemaining() {
+        return agonyTicksRemaining;
+    }
+
+    /**
+     * Sets the agony state by adding/removing the condition and managing state.
+     *
+     * @param agonizing true to enter agony, false to exit
+     */
+    public void setAgonizing(boolean agonizing) {
+        this.entityData.set(DATA_AGONIZING, agonizing);
+        if (agonizing) {
+            this.agonyTicksRemaining = ModConfig.get().getAgonyDurationTicks();
+            this.agonyHitsTaken = 0;
+            this.revivingPlayerUUID = null;
+            this.reviveProgressTicks = 0;
+            this.ticksSinceLastRevivePacket = Integer.MAX_VALUE;
+            addCondition(AgonyCondition.INSTANCE);
+        } else {
+            this.agonyTicksRemaining = 0;
+            this.agonyHitsTaken = 0;
+            this.revivingPlayerUUID = null;
+            this.reviveProgressTicks = 0;
+            this.ticksSinceLastRevivePacket = Integer.MAX_VALUE;
+            removeCondition(AgonyCondition.INSTANCE);
+        }
+    }
+
+    /**
+     * Processes one tick of revive progress from a player.
+     * Called by the network handler when a revive tick packet is received.
+     *
+     * @param player the player performing the revive
+     */
+    public void tickReviveProgress(Player player) {
+        if (!isAgonizing()) return;
+
+        // Only one player can revive at a time
+        if (this.revivingPlayerUUID == null) {
+            this.revivingPlayerUUID = player.getUUID();
+            this.reviveProgressTicks = 0;
+        }
+        if (!player.getUUID().equals(this.revivingPlayerUUID)) {
+            return;
+        }
+
+        this.ticksSinceLastRevivePacket = 0;
+        this.reviveProgressTicks++;
+
+        // Send action bar progress to the reviving player
+        int percent = (int) ((float) reviveProgressTicks / ModConfig.get().getReviveDurationTicks() * 100);
+        percent = Math.min(percent, 100);
+        player.displayClientMessage(
+                net.minecraft.network.chat.Component.translatable(
+                        "action.immersivecompanions.reviving", percent),
+                true);
+
+        // Check completion
+        if (reviveProgressTicks >= ModConfig.get().getReviveDurationTicks()) {
+            completeRevive();
+        }
+    }
+
+    /**
+     * Completes the revive process, healing the companion and exiting agony.
+     */
+    private void completeRevive() {
+        setAgonizing(false);
+        float reviveHealth = this.getMaxHealth() * 0.25f;
+        this.setHealth(reviveHealth);
+
+        // HEART particle burst
+        if (this.level() instanceof ServerLevel serverLevel) {
+            serverLevel.sendParticles(
+                    net.minecraft.core.particles.ParticleTypes.HEART,
+                    this.getX(), this.getY() + this.getBbHeight() * 0.5, this.getZ(),
+                    15, 0.5, 0.5, 0.5, 0);
+        }
+
+        // Enter critical injury if health is below threshold
+        if (ModConfig.get().isEnableCriticalInjury()
+                && reviveHealth <= ModConfig.get().getCriticalInjuryThreshold()) {
+            setCriticallyInjured(true);
+        }
+    }
+
     /**
      * Gets the base recruitment price for this companion.
      * This is calculated once at spawn time and never changes.
@@ -603,7 +725,7 @@ public class CompanionEntity extends PathfinderMob implements RangedAttackMob {
      * True when in PASSIVE stance or critically injured.
      */
     public boolean shouldFlee() {
-        return isPassive() || isCriticallyInjured();
+        return isPassive() || isCriticallyInjured() || isAgonizing();
     }
 
     /**
@@ -815,7 +937,7 @@ public class CompanionEntity extends PathfinderMob implements RangedAttackMob {
      * consistency.
      */
     public void startSneaking() {
-        if (this.getPose() == Pose.DYING || this.getPose() == Pose.SLEEPING)
+        if (this.getPose() == Pose.DYING || this.getPose() == Pose.SLEEPING || this.getPose() == Pose.SWIMMING)
             return;
         this.setShiftKeyDown(true);
         this.setPose(Pose.CROUCHING);
@@ -1106,6 +1228,11 @@ public class CompanionEntity extends PathfinderMob implements RangedAttackMob {
         tag.putInt("SkinIndex", getSkinIndex());
         tag.putString("Team", getCompanionTeam());
         tag.putBoolean("CriticallyInjured", isCriticallyInjured());
+        tag.putBoolean("Agonizing", isAgonizing());
+        if (isAgonizing()) {
+            tag.putInt("AgonyTicksRemaining", agonyTicksRemaining);
+            tag.putInt("AgonyHitsTaken", agonyHitsTaken);
+        }
         tag.putInt("BasePrice", getBasePrice());
         tag.putString("ModeId", currentMode.getId());
         tag.putString("CombatStance", currentStance.getId());
@@ -1151,6 +1278,15 @@ public class CompanionEntity extends PathfinderMob implements RangedAttackMob {
         }
         if (tag.contains("CriticallyInjured")) {
             setCriticallyInjured(tag.getBoolean("CriticallyInjured"));
+        }
+        if (tag.contains("Agonizing") && tag.getBoolean("Agonizing")) {
+            setAgonizing(true);
+            if (tag.contains("AgonyTicksRemaining")) {
+                this.agonyTicksRemaining = tag.getInt("AgonyTicksRemaining");
+            }
+            if (tag.contains("AgonyHitsTaken")) {
+                this.agonyHitsTaken = tag.getInt("AgonyHitsTaken");
+            }
         }
         if (tag.contains("BasePrice")) {
             setBasePrice(tag.getInt("BasePrice"));
@@ -1257,9 +1393,38 @@ public class CompanionEntity extends PathfinderMob implements RangedAttackMob {
         this.level().addFreshEntity(arrow);
     }
 
+    @Override
+    public void die(DamageSource damageSource) {
+        if (!this.level().isClientSide && ModConfig.get().isEnableAgony()) {
+            if (!this.isAgonizing()) {
+                // First death: enter agony instead of dying
+                this.setHealth(1.0f);
+                this.dead = false;
+                setAgonizing(true);
+                return;
+            }
+            if (this.agonyHitsTaken < ModConfig.get().getAgonyHitsBeforeDeath()) {
+                // Still has remaining hits: absorb the death, restore health
+                this.setHealth(1.0f);
+                this.dead = false;
+                return;
+            }
+            // Final hit or timer expired: die for real
+            setAgonizing(false);
+        }
+        super.die(damageSource);
+    }
+
     // Handle reputation when attacked by player
     @Override
     public boolean hurt(DamageSource source, float amount) {
+        // When agonizing, count hits and let super.hurt() handle visual feedback
+        // Death prevention is handled in die() which restores health if hits remain
+        if (!this.level().isClientSide && this.isAgonizing()) {
+            this.agonyHitsTaken++;
+            return super.hurt(source, amount);
+        }
+
         boolean hurt = super.hurt(source, amount);
 
         if (hurt && source.getEntity() instanceof Player player && !this.level().isClientSide) {
@@ -1295,6 +1460,15 @@ public class CompanionEntity extends PathfinderMob implements RangedAttackMob {
         }
         super.knockback(strength, x, z);
     }
+
+    @Override
+    public boolean canBeSeenAsEnemy() {
+        if (this.isAgonizing()) {
+            return false;
+        }
+        return super.canBeSeenAsEnemy();
+    }
+
 
     private void spreadNegativeGossip(Player player) {
         if (!(this.level() instanceof ServerLevel serverLevel))
@@ -1339,8 +1513,36 @@ public class CompanionEntity extends PathfinderMob implements RangedAttackMob {
                 }
             }
 
+            // Tick agony state
+            if (this.isAgonizing()) {
+                // Only decrement timer if no one is actively reviving
+                if (this.revivingPlayerUUID == null) {
+                    this.agonyTicksRemaining--;
+                }
+                if (this.agonyTicksRemaining <= 0) {
+                    // Time's up - force hit count to max so die() lets death through
+                    this.agonyHitsTaken = ModConfig.get().getAgonyHitsBeforeDeath();
+                    this.setHealth(0);
+                    this.die(this.damageSources().generic());
+                }
+
+                // Reset revive progress if no packet received for 3+ ticks
+                if (this.revivingPlayerUUID != null) {
+                    this.ticksSinceLastRevivePacket++;
+                    if (this.ticksSinceLastRevivePacket >= 3) {
+                        this.revivingPlayerUUID = null;
+                        this.reviveProgressTicks = 0;
+                    }
+                }
+
+                // Force sleeping pose (in case something overrides it)
+                if (this.getPose() != Pose.SWIMMING) {
+                    this.setPose(Pose.SWIMMING);
+                }
+            }
+
             // Periodic health check for edge cases (regen effects, commands, etc.)
-            if (this.tickCount % 10 == 0 && ModConfig.get().isEnableCriticalInjury()) {
+            if (this.tickCount % 10 == 0 && ModConfig.get().isEnableCriticalInjury() && !this.isAgonizing()) {
                 boolean shouldBeInjured = this.getHealth() <= ModConfig.get().getCriticalInjuryThreshold();
                 if (this.isCriticallyInjured() != shouldBeInjured) {
                     setCriticallyInjured(shouldBeInjured);
@@ -1361,8 +1563,10 @@ public class CompanionEntity extends PathfinderMob implements RangedAttackMob {
                 stopSprinting();
             }
 
-            // Crouch when: owner is crouching (follow mode), critically injured, reviving owner, or dancing
-            if ((this.getMode() == CompanionMode.FOLLOW && this.getOwner() != null && this.getOwner().isCrouching())
+            // Crouch management - skip when agonizing (agony uses SLEEPING pose)
+            if (this.isAgonizing()) {
+                // Don't touch pose - agony manages its own pose
+            } else if ((this.getMode() == CompanionMode.FOLLOW && this.getOwner() != null && this.getOwner().isCrouching())
                     || this.isCriticallyInjured() || this.isRevivingOwner() || this.isDancing()) {
                 // Don't force crouch when dancing - let the goal control it
                 if (!this.isDancing() && !this.isCrouching()) {
@@ -1396,6 +1600,31 @@ public class CompanionEntity extends PathfinderMob implements RangedAttackMob {
         }
         // Normal companions avoid damage-causing falls (>3 blocks)
         return 3;
+    }
+
+    @Override
+    public void travel(net.minecraft.world.phys.Vec3 travelVector) {
+        if (isAgonizing()) {
+            super.travel(net.minecraft.world.phys.Vec3.ZERO);
+            return;
+        }
+        super.travel(travelVector);
+    }
+
+    @Override
+    protected EntityDimensions getDefaultDimensions(Pose pose) {
+        if (pose == Pose.SWIMMING) {
+            return EntityDimensions.scalable(1.0f, 0.4f);
+        }
+        return super.getDefaultDimensions(pose);
+    }
+
+    @Override
+    public float getPickRadius() {
+        if (isAgonizing()) {
+            return 0.5f;
+        }
+        return super.getPickRadius();
     }
 
     @Override
@@ -1490,6 +1719,11 @@ public class CompanionEntity extends PathfinderMob implements RangedAttackMob {
 
     @Override
     protected InteractionResult mobInteract(Player player, InteractionHand hand) {
+        // Don't open any screen when agonizing - revive is handled via network packets
+        if (this.isAgonizing()) {
+            return InteractionResult.PASS;
+        }
+
         // Only handle main hand interactions
         if (hand != InteractionHand.MAIN_HAND) {
             return super.mobInteract(player, hand);

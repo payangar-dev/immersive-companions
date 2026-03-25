@@ -41,6 +41,12 @@ public class FabricNetworking implements ModNetworking {
                 PurchaseCompanionPayload.STREAM_CODEC
         );
 
+        // C2S: Revive companion tick
+        PayloadTypeRegistry.playC2S().register(
+                ReviveCompanionTickPayload.TYPE,
+                ReviveCompanionTickPayload.STREAM_CODEC
+        );
+
         // Register server handler for close packet
         ServerPlayNetworking.registerGlobalReceiver(
                 CloseRecruitmentScreenPayload.TYPE,
@@ -100,6 +106,24 @@ public class FabricNetworking implements ModNetworking {
                 }
         );
 
+        // Register server handler for revive tick packet
+        ServerPlayNetworking.registerGlobalReceiver(
+                ReviveCompanionTickPayload.TYPE,
+                (payload, context) -> {
+                    ServerPlayer player = context.player();
+                    ServerLevel level = player.serverLevel();
+
+                    context.server().execute(() -> {
+                        var entity = level.getEntity(payload.entityId());
+                        if (entity instanceof CompanionEntity companion
+                                && companion.isAgonizing()
+                                && player.distanceToSqr(companion) <= 9.0) {
+                            companion.tickReviveProgress(player);
+                        }
+                    });
+                }
+        );
+
         ModNetworking.init(new FabricNetworking());
     }
 
@@ -144,5 +168,11 @@ public class FabricNetworking implements ModNetworking {
     @Environment(EnvType.CLIENT)
     public void sendPurchaseCompanion(int entityId) {
         ClientPlayNetworking.send(new PurchaseCompanionPayload(entityId));
+    }
+
+    @Override
+    @Environment(EnvType.CLIENT)
+    public void sendReviveCompanionTick(int entityId) {
+        ClientPlayNetworking.send(new ReviveCompanionTickPayload(entityId));
     }
 }

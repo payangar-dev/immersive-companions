@@ -60,6 +60,13 @@ public class NeoForgeNetworking implements ModNetworking {
                 SyncPlayerDancePayload.STREAM_CODEC,
                 NeoForgeNetworking::handleSyncPlayerDance
         );
+
+        // C2S: Revive companion tick (held right-click on agonizing companion)
+        registrar.playToServer(
+                ReviveCompanionTickPayload.TYPE,
+                ReviveCompanionTickPayload.STREAM_CODEC,
+                NeoForgeNetworking::handleReviveCompanionTick
+        );
     }
 
     private static void handleOpenRecruitmentScreen(OpenRecruitmentScreenPayload payload, IPayloadContext context) {
@@ -142,6 +149,25 @@ public class NeoForgeNetworking implements ModNetworking {
     @Override
     public void sendOpenRecruitmentScreen(ServerPlayer player, int entityId, int basePrice, int finalPrice) {
         PacketDistributor.sendToPlayer(player, new OpenRecruitmentScreenPayload(entityId, basePrice, finalPrice));
+    }
+
+    private static void handleReviveCompanionTick(ReviveCompanionTickPayload payload, IPayloadContext context) {
+        context.enqueueWork(() -> {
+            if (context.player() instanceof ServerPlayer player) {
+                ServerLevel level = player.serverLevel();
+                var entity = level.getEntity(payload.entityId());
+                if (entity instanceof CompanionEntity companion
+                        && companion.isAgonizing()
+                        && player.distanceToSqr(companion) <= 9.0) {
+                    companion.tickReviveProgress(player);
+                }
+            }
+        });
+    }
+
+    @Override
+    public void sendReviveCompanionTick(int entityId) {
+        PacketDistributor.sendToServer(new ReviveCompanionTickPayload(entityId));
     }
 
     @Override

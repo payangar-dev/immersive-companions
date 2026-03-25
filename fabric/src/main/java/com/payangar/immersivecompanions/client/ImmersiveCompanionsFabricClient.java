@@ -10,6 +10,7 @@ import com.payangar.immersivecompanions.registry.FabricMenuRegistration;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
+import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import net.fabricmc.fabric.api.client.rendering.v1.EntityRendererRegistry;
 import net.fabricmc.fabric.api.resource.ResourceManagerHelper;
 import net.fabricmc.fabric.api.resource.SimpleSynchronousResourceReloadListener;
@@ -35,6 +36,9 @@ public class ImmersiveCompanionsFabricClient implements ClientModInitializer {
 
         // Register networking client handlers
         FabricNetworking.registerClientHandlers();
+
+        // Register client tick handler for revive input detection
+        ClientTickEvents.END_CLIENT_TICK.register(client -> ReviveInputHandler.tick());
 
         // Register resource reload listener for skin discovery
         ResourceManagerHelper.get(PackType.CLIENT_RESOURCES).registerReloadListener(

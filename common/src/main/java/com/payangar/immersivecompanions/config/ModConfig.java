@@ -29,6 +29,10 @@ public class ModConfig {
     public static float teamCoordinationRange = 16.0f;
     public static boolean enableCompanionRevival = true;
     public static int companionRevivalTicks = 60;
+    public static boolean enableAgony = true;
+    public static int agonyDurationTicks = 1200;
+    public static int agonyHitsBeforeDeath = 3;
+    public static int reviveDurationTicks = 100;
 
     // Internal class for JSON serialization
     private static class ConfigData {
@@ -40,6 +44,10 @@ public class ModConfig {
         float teamCoordinationRange = 16.0f;
         boolean enableCompanionRevival = true;
         int companionRevivalTicks = 60;
+        boolean enableAgony = true;
+        int agonyDurationTicks = 1200;
+        int agonyHitsBeforeDeath = 3;
+        int reviveDurationTicks = 100;
     }
 
     /**
@@ -98,6 +106,38 @@ public class ModConfig {
     }
 
     /**
+     * Whether the agony system is enabled.
+     * When enabled, companions enter a downed state instead of dying immediately.
+     */
+    public boolean isEnableAgony() {
+        return enableAgony;
+    }
+
+    /**
+     * Duration of the agony state in ticks before death.
+     * Default is 1200 (60 seconds).
+     */
+    public int getAgonyDurationTicks() {
+        return agonyDurationTicks;
+    }
+
+    /**
+     * Number of hits an agonizing companion can take before dying.
+     * Default is 3.
+     */
+    public int getAgonyHitsBeforeDeath() {
+        return agonyHitsBeforeDeath;
+    }
+
+    /**
+     * Duration in ticks a player must hold right-click to revive.
+     * Default is 100 (5 seconds).
+     */
+    public int getReviveDurationTicks() {
+        return reviveDurationTicks;
+    }
+
+    /**
      * Loads the config from file, or creates default config if not found.
      * Should be called during mod initialization.
      */
@@ -117,6 +157,10 @@ public class ModConfig {
                     teamCoordinationRange = data.teamCoordinationRange;
                     enableCompanionRevival = data.enableCompanionRevival;
                     companionRevivalTicks = data.companionRevivalTicks;
+                    enableAgony = data.enableAgony;
+                    agonyDurationTicks = data.agonyDurationTicks;
+                    agonyHitsBeforeDeath = data.agonyHitsBeforeDeath;
+                    reviveDurationTicks = data.reviveDurationTicks;
                 }
                 ImmersiveCompanions.LOGGER.info("Loaded config from {}", configPath);
             } catch (IOException e) {
@@ -146,6 +190,10 @@ public class ModConfig {
             data.teamCoordinationRange = teamCoordinationRange;
             data.enableCompanionRevival = enableCompanionRevival;
             data.companionRevivalTicks = companionRevivalTicks;
+            data.enableAgony = enableAgony;
+            data.agonyDurationTicks = agonyDurationTicks;
+            data.agonyHitsBeforeDeath = agonyHitsBeforeDeath;
+            data.reviveDurationTicks = reviveDurationTicks;
             String json = GSON.toJson(data);
             Files.writeString(configPath, json);
         } catch (IOException e) {

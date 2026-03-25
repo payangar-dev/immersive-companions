@@ -68,6 +68,48 @@ public class ConfigScreenFactory {
                                         .range(20, 200)
                                         .step(10))
                                 .build())
+                        .option(Option.<Boolean>createBuilder()
+                                .name(Component.translatable("config.immersivecompanions.enableAgony"))
+                                .description(OptionDescription.of(
+                                        Component.translatable("config.immersivecompanions.enableAgony.desc")))
+                                .binding(true,
+                                        () -> ModConfig.enableAgony,
+                                        v -> ModConfig.enableAgony = v)
+                                .controller(TickBoxControllerBuilder::create)
+                                .build())
+                        .option(Option.<Integer>createBuilder()
+                                .name(Component.translatable("config.immersivecompanions.agonyDurationTicks"))
+                                .description(OptionDescription.of(
+                                        Component.translatable("config.immersivecompanions.agonyDurationTicks.desc")))
+                                .binding(1200,
+                                        () -> ModConfig.agonyDurationTicks,
+                                        v -> ModConfig.agonyDurationTicks = v)
+                                .controller(opt -> IntegerSliderControllerBuilder.create(opt)
+                                        .range(200, 2400)
+                                        .step(100))
+                                .build())
+                        .option(Option.<Integer>createBuilder()
+                                .name(Component.translatable("config.immersivecompanions.agonyHitsBeforeDeath"))
+                                .description(OptionDescription.of(
+                                        Component.translatable("config.immersivecompanions.agonyHitsBeforeDeath.desc")))
+                                .binding(3,
+                                        () -> ModConfig.agonyHitsBeforeDeath,
+                                        v -> ModConfig.agonyHitsBeforeDeath = v)
+                                .controller(opt -> IntegerSliderControllerBuilder.create(opt)
+                                        .range(1, 10)
+                                        .step(1))
+                                .build())
+                        .option(Option.<Integer>createBuilder()
+                                .name(Component.translatable("config.immersivecompanions.reviveDurationTicks"))
+                                .description(OptionDescription.of(
+                                        Component.translatable("config.immersivecompanions.reviveDurationTicks.desc")))
+                                .binding(100,
+                                        () -> ModConfig.reviveDurationTicks,
+                                        v -> ModConfig.reviveDurationTicks = v)
+                                .controller(opt -> IntegerSliderControllerBuilder.create(opt)
+                                        .range(20, 400)
+                                        .step(10))
+                                .build())
                         .build())
                 .save(ModConfig::save)
                 .build()

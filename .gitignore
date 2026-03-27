@@ -35,3 +35,4 @@ desktop.ini
 *.jar
 !gradle/wrapper/*.jar
 local.properties
+.sources

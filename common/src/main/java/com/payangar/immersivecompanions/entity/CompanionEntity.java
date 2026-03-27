@@ -1598,6 +1598,7 @@ public class CompanionEntity extends PathfinderMob implements RangedAttackMob {
             // Update weapon holster state based on target presence
             updateWeaponHolsterState();
         }
+
     }
 
     @Override

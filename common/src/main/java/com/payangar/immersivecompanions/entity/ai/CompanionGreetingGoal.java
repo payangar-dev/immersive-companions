@@ -42,6 +42,11 @@ public class CompanionGreetingGoal extends Goal {
             return false;
         }
 
+        // Don't greet while agonizing (downed on the ground)
+        if (companion.isAgonizing()) {
+            return false;
+        }
+
         // Find a valid player to greet
         this.targetPlayer = findPlayerToGreet();
         return this.targetPlayer != null;

@@ -51,6 +51,12 @@ public class CompanionEntityPatch extends HumanoidMobPatch<CompanionEntity>
      */
     private boolean wasDancing = false;
 
+    /**
+     * Tracks the previous agony state so we can detect the transition out of agony
+     * and let the living motion system resume normal animations.
+     */
+    private boolean wasAgonizing = false;
+
     public CompanionEntityPatch(CompanionEntity original) {
         super(original, Factions.VILLAGER); // Allies with villagers, hostile to undead
         original.setAnimationListener(this);
@@ -87,6 +93,10 @@ public class CompanionEntityPatch extends HumanoidMobPatch<CompanionEntity>
         // Critical injury animations (when health <= 2 hearts)
         animator.addLivingAnimation(LivingMotions.KNEEL, Animations.BIPED_KNEEL);
         animator.addLivingAnimation(LivingMotions.SNEAK, Animations.BIPED_SNEAK);
+
+        // Agony: BIPED_SLEEPING is a plain StaticAnimation that loops naturally,
+        // showing the companion lying on the ground during agony
+        animator.addLivingAnimation(LivingMotions.SLEEP, Animations.BIPED_SLEEPING);
 
         // Note: Ranged animations (AIM, SHOT, RELOAD) come from weapon capabilities
         // via modifyLivingMotionByCurrentItem() inherited from HumanoidMobPatch
@@ -156,6 +166,20 @@ public class CompanionEntityPatch extends HumanoidMobPatch<CompanionEntity>
             this.currentLivingMotion = LivingMotions.INACTION;
             this.currentCompositeMotion = LivingMotions.INACTION;
             return;
+        }
+
+        // Agony: use SLEEP living motion mapped to BIPED_KNOCKDOWN.
+        // HitAnimation.getPoseByTime() always returns the last frame (entity on ground),
+        // so the living motion system continuously shows the downed pose without looping
+        // the fall transition.
+        if (this.original.isAgonizing()) {
+            this.wasAgonizing = true;
+            this.currentLivingMotion = LivingMotions.SLEEP;
+            this.currentCompositeMotion = LivingMotions.SLEEP;
+            return;
+        }
+        if (this.wasAgonizing) {
+            this.wasAgonizing = false;
         }
 
         if (this.original.isDeadOrDying()) {

@@ -75,8 +75,8 @@ public class CompanionDanceGoal extends Goal {
             return false;
         }
 
-        // Don't dance if critically injured or combat disabled
-        if (companion.isCriticallyInjured() || companion.isCombatDisabled()) {
+        // Don't dance if agonizing, critically injured, or combat disabled
+        if (companion.isAgonizing() || companion.isCriticallyInjured() || companion.isCombatDisabled()) {
             return false;
         }
 

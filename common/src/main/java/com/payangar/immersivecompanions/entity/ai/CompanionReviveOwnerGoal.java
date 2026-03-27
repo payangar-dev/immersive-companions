@@ -30,7 +30,7 @@ import java.util.List;
 public class CompanionReviveOwnerGoal extends Goal {
 
     /** Distance within which revival can occur (matches HR's rescue distance) */
-    private static final double REVIVAL_RANGE = 3.0;
+    private static final double REVIVAL_RANGE = 2.0;
     private static final double REVIVAL_RANGE_SQ = REVIVAL_RANGE * REVIVAL_RANGE;
 
     /** How often to spawn particles during revival (in ticks) */
@@ -94,7 +94,7 @@ public class CompanionReviveOwnerGoal extends Goal {
                 CompanionEntity.class,
                 companion.getBoundingBox().inflate(32.0),
                 other -> other != companion
-                        && other.isRevivingOwner()
+                        && (other.isRevivingOwner() || other.isClaimingRevive())
                         && owner.equals(other.getOwner())
         );
 
@@ -129,11 +129,14 @@ public class CompanionReviveOwnerGoal extends Goal {
     @Override
     public void start() {
         this.revivingTicks = 0;
+        companion.setClaimingRevive(true);
     }
 
     @Override
     public void stop() {
+        companion.setClaimingRevive(false);
         companion.setRevivingOwner(false);
+        companion.stopSprinting();
         this.knockedOutOwner = null;
         this.revivingTicks = 0;
         companion.getNavigation().stop();
@@ -153,12 +156,14 @@ public class CompanionReviveOwnerGoal extends Goal {
         if (distanceSq > REVIVAL_RANGE_SQ) {
             // Move toward owner if too far
             companion.getNavigation().moveTo(knockedOutOwner, 1.0);
+            companion.startSprinting();
 
             // Not reviving yet - reset progress
             revivingTicks = 0;
         } else {
             // Within range - stop moving and start reviving
             companion.getNavigation().stop();
+            companion.stopSprinting();
             companion.setRevivingOwner(true);
 
             // Increment revival progress

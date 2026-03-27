@@ -171,6 +171,7 @@ public class CompanionEntity extends PathfinderMob implements RangedAttackMob {
      * Set by CompanionReviveOwnerGoal to prevent tick() from overriding crouch state.
      */
     private boolean isRevivingOwner = false;
+    private boolean isClaimingRevive = false;
 
     /** Ticks remaining before agony death. Server-side only. */
     private int agonyTicksRemaining = 0;
@@ -760,6 +761,14 @@ public class CompanionEntity extends PathfinderMob implements RangedAttackMob {
      */
     public void setRevivingOwner(boolean reviving) {
         this.isRevivingOwner = reviving;
+    }
+
+    public boolean isClaimingRevive() {
+        return isClaimingRevive;
+    }
+
+    public void setClaimingRevive(boolean claiming) {
+        this.isClaimingRevive = claiming;
     }
 
     /**

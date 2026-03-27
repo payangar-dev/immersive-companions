@@ -2,8 +2,6 @@ package com.payangar.immersivecompanions.entity.mode;
 
 import net.minecraft.network.chat.Component;
 
-import javax.annotation.Nullable;
-
 /**
  * Enum defining the behavioral modes for companions.
  * Each mode controls which movement-related goals are active via canUse() checks.
@@ -45,7 +43,6 @@ public enum CompanionMode {
      * @param id The mode ID to look up
      * @return The corresponding mode, or WANDER as fallback
      */
-    @Nullable
     public static CompanionMode byId(String id) {
         for (CompanionMode mode : values()) {
             if (mode.id.equals(id)) {

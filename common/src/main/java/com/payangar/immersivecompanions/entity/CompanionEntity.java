@@ -434,6 +434,24 @@ public class CompanionEntity extends PathfinderMob implements RangedAttackMob {
     }
 
     /**
+     * Integrates the companion's custom team system with Minecraft's alliance checks.
+     * This ensures vanilla mechanics (targeting, PvP rules) respect companion alliances.
+     */
+    @Override
+    public boolean isAlliedTo(Entity other) {
+        if (other instanceof CompanionEntity otherCompanion) {
+            return isOnSameTeam(otherCompanion);
+        }
+        if (ownerUUID != null && other instanceof Player player) {
+            return ownerUUID.equals(player.getUUID());
+        }
+        if (ownerUUID != null && other instanceof TamableAnimal tameable) {
+            return ownerUUID.equals(tameable.getOwnerUUID());
+        }
+        return super.isAlliedTo(other);
+    }
+
+    /**
      * Checks if this companion is critically injured.
      * Uses the condition system for the actual state tracking.
      *
@@ -859,11 +877,11 @@ public class CompanionEntity extends PathfinderMob implements RangedAttackMob {
             ticksSinceLastTarget++;
         }
 
-        Boolean shouldHostered = isCombatDisabled()
+        boolean shouldHolster = isCombatDisabled()
                 || ticksSinceLastTarget >= WEAPON_HOLSTER_DELAY_TICKS;
 
-        if (isWeaponHolstered() != shouldHostered) {
-            setWeaponHolstered(shouldHostered);
+        if (isWeaponHolstered() != shouldHolster) {
+            setWeaponHolstered(shouldHolster);
         }
     }
 
@@ -1106,6 +1124,18 @@ public class CompanionEntity extends PathfinderMob implements RangedAttackMob {
         greetingCooldowns.clear();
     }
 
+    /**
+     * Purges expired entries from the greeting cooldowns map to prevent unbounded growth.
+     * Called periodically from tick().
+     */
+    private void purgeExpiredGreetingCooldowns() {
+        if (greetingCooldowns.isEmpty()) return;
+        long currentTime = this.level().getGameTime();
+        greetingCooldowns.entrySet().removeIf(
+                entry -> (currentTime - entry.getValue()) >= GREETING_COOLDOWN_TICKS
+        );
+    }
+
     /** Number of different recruitment messages available */
     private static final int RECRUITMENT_MESSAGE_COUNT = 12;
 
@@ -1241,34 +1271,17 @@ public class CompanionEntity extends PathfinderMob implements RangedAttackMob {
             tag.putUUID("OwnerUUID", ownerUUID);
         }
 
-        // Save armor equipment explicitly
-        ListTag armorItems = new ListTag();
-        for (ItemStack stack : this.getArmorSlots()) {
-            if (stack.isEmpty()) {
-                armorItems.add(new CompoundTag());
-            } else {
-                armorItems.add(stack.save(this.registryAccess()));
-            }
-        }
-        tag.put("CompanionArmor", armorItems);
-
-        // Save hand items explicitly
-        ListTag handItems = new ListTag();
-        for (ItemStack stack : this.getHandSlots()) {
-            if (stack.isEmpty()) {
-                handItems.add(new CompoundTag());
-            } else {
-                handItems.add(stack.save(this.registryAccess()));
-            }
-        }
-        tag.put("CompanionHands", handItems);
+        // Equipment is saved/loaded by Mob.addAdditionalSaveData/readAdditionalSaveData
+        // (ArmorItems/HandItems tags). No custom saving needed.
     }
 
     @Override
     public void readAdditionalSaveData(CompoundTag tag) {
         super.readAdditionalSaveData(tag);
         if (tag.contains("Gender")) {
-            setGender(CompanionGender.values()[tag.getInt("Gender")]);
+            int genderOrdinal = tag.getInt("Gender");
+            CompanionGender[] genders = CompanionGender.values();
+            setGender(genders[Math.min(genderOrdinal, genders.length - 1)]);
         }
         if (tag.contains("SkinIndex")) {
             setSkinIndex(tag.getInt("SkinIndex"));
@@ -1310,7 +1323,8 @@ public class CompanionEntity extends PathfinderMob implements RangedAttackMob {
             setWeaponHolstered(tag.getBoolean("WeaponHolstered"));
         }
 
-        // Load armor equipment
+        // Migration: load from legacy custom tags if present (pre-1.1 saves).
+        // Modern saves use vanilla ArmorItems/HandItems loaded by super.readAdditionalSaveData().
         if (tag.contains("CompanionArmor", Tag.TAG_LIST)) {
             ListTag armorItems = tag.getList("CompanionArmor", Tag.TAG_COMPOUND);
             EquipmentSlot[] armorSlots = {EquipmentSlot.FEET, EquipmentSlot.LEGS, EquipmentSlot.CHEST, EquipmentSlot.HEAD};
@@ -1323,8 +1337,6 @@ public class CompanionEntity extends PathfinderMob implements RangedAttackMob {
                 }
             }
         }
-
-        // Load hand items
         if (tag.contains("CompanionHands", Tag.TAG_LIST)) {
             ListTag handItems = tag.getList("CompanionHands", Tag.TAG_COMPOUND);
             EquipmentSlot[] handSlots = {EquipmentSlot.MAINHAND, EquipmentSlot.OFFHAND};
@@ -1561,6 +1573,11 @@ public class CompanionEntity extends PathfinderMob implements RangedAttackMob {
             // Enforce sprint restrictions - stop sprinting if no longer allowed
             if (isSprinting() && !canSprint()) {
                 stopSprinting();
+            }
+
+            // Periodically purge expired greeting cooldowns to prevent unbounded growth
+            if (this.tickCount % 1200 == 0) {
+                purgeExpiredGreetingCooldowns();
             }
 
             // Crouch management - skip when agonizing (agony uses SLEEPING pose)

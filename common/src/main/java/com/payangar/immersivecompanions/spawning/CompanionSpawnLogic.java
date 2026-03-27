@@ -14,8 +14,13 @@ import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.levelgen.Heightmap;
 import net.minecraft.world.phys.AABB;
 
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.world.level.Level;
+
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 /**
@@ -24,7 +29,12 @@ import java.util.Set;
  */
 public class CompanionSpawnLogic {
 
-    private static final Set<ChunkPos> processedChunks = new HashSet<>();
+    /** Per-dimension tracking of processed chunks to avoid cross-dimension collisions. */
+    private static final Map<ResourceKey<Level>, Set<ChunkPos>> processedChunks = new HashMap<>();
+
+    /** Maximum total tracked chunks across all dimensions to prevent unbounded memory growth. */
+    private static final int MAX_TRACKED_CHUNKS = 10_000;
+
     private static final int SEARCH_RADIUS = 64;
     private static final int SPAWN_RADIUS = 32;
 
@@ -71,12 +81,13 @@ public class CompanionSpawnLogic {
      */
     public static void trySpawnInVillage(ServerLevel level, BlockPos centerPos) {
         ChunkPos chunkPos = new ChunkPos(centerPos);
+        ResourceKey<Level> dimension = level.dimension();
 
-        // Check if we've already processed this chunk
-        if (processedChunks.contains(chunkPos)) {
+        // Check if we've already processed this chunk in this dimension
+        if (isChunkProcessed(dimension, chunkPos)) {
             return;
         }
-        processedChunks.add(chunkPos);
+        markChunkProcessed(dimension, chunkPos);
 
         // Count villagers in the area
         AABB searchBox = new AABB(centerPos).inflate(SEARCH_RADIUS);
@@ -155,16 +166,32 @@ public class CompanionSpawnLogic {
     }
 
     /**
-     * Checks if a chunk position has been processed.
+     * Checks if a chunk position has been processed in the given dimension.
+     *
+     * @param dimension The dimension key
+     * @param pos       The chunk position
      */
-    public static boolean isChunkProcessed(ChunkPos pos) {
-        return processedChunks.contains(pos);
+    public static boolean isChunkProcessed(ResourceKey<Level> dimension, ChunkPos pos) {
+        Set<ChunkPos> chunks = processedChunks.get(dimension);
+        return chunks != null && chunks.contains(pos);
     }
 
     /**
-     * Marks a chunk as processed.
+     * Marks a chunk as processed in the given dimension.
+     * If the total tracked chunks exceeds {@link #MAX_TRACKED_CHUNKS}, all entries are cleared
+     * to prevent unbounded memory growth on long-running servers.
+     *
+     * @param dimension The dimension key
+     * @param pos       The chunk position
      */
-    public static void markChunkProcessed(ChunkPos pos) {
-        processedChunks.add(pos);
+    public static void markChunkProcessed(ResourceKey<Level> dimension, ChunkPos pos) {
+        // Prevent unbounded growth: clear all if we exceed the cap
+        int totalSize = processedChunks.values().stream().mapToInt(Set::size).sum();
+        if (totalSize >= MAX_TRACKED_CHUNKS) {
+            ImmersiveCompanions.LOGGER.debug("Processed chunks cache exceeded {} entries, clearing", MAX_TRACKED_CHUNKS);
+            processedChunks.clear();
+        }
+
+        processedChunks.computeIfAbsent(dimension, k -> new HashSet<>()).add(pos);
     }
 }

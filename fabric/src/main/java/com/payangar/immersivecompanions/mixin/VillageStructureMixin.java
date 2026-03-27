@@ -35,8 +35,8 @@ public abstract class VillageStructureMixin {
             return;
         }
 
-        // Skip if already processed
-        if (CompanionSpawnLogic.isChunkProcessed(chunkPos)) {
+        // Skip if already processed in this dimension
+        if (CompanionSpawnLogic.isChunkProcessed(level.dimension(), chunkPos)) {
             return;
         }
 
@@ -48,8 +48,8 @@ public abstract class VillageStructureMixin {
                 (fullBox.minZ() + fullBox.maxZ()) / 2
         );
 
-        // Mark as processed
-        CompanionSpawnLogic.markChunkProcessed(chunkPos);
+        // Mark as processed in this dimension
+        CompanionSpawnLogic.markChunkProcessed(level.dimension(), chunkPos);
 
         // Schedule spawn check for when entities are loaded
         level.getServer().execute(() -> {

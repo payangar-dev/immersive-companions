@@ -2,8 +2,6 @@ package com.payangar.immersivecompanions.entity.combat;
 
 import net.minecraft.network.chat.Component;
 
-import javax.annotation.Nullable;
-
 /**
  * Enum representing combat stances that control companion targeting behavior.
  * Each stance defines which targets the companion will engage.
@@ -70,7 +68,6 @@ public enum CombatStance {
      * @param id The stance ID
      * @return The stance, or AGGRESSIVE if not found
      */
-    @Nullable
     public static CombatStance byId(String id) {
         for (CombatStance stance : values()) {
             if (stance.id.equals(id)) {

@@ -8,7 +8,7 @@ import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.ai.goal.Goal;
 import net.minecraft.world.entity.ai.navigation.PathNavigation;
 import net.minecraft.world.entity.player.Player;
-import net.minecraft.world.level.Level;
+
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
 
@@ -46,7 +46,6 @@ public class CompanionFollowOwnerGoal extends Goal {
     private final CompanionEntity companion;
     private final double speedModifier;
     private final PathNavigation navigation;
-    private final Level level;
 
     private LivingEntity owner;
     private int timeToRecalcPath;
@@ -55,7 +54,6 @@ public class CompanionFollowOwnerGoal extends Goal {
         this.companion = companion;
         this.speedModifier = speedModifier;
         this.navigation = companion.getNavigation();
-        this.level = companion.level();
         this.setFlags(EnumSet.of(Goal.Flag.MOVE, Goal.Flag.LOOK));
     }
 
@@ -160,12 +158,12 @@ public class CompanionFollowOwnerGoal extends Goal {
 
         // Use SafePositionFinder with extended search parameters
         BlockPos safePos = SafePositionFinder.findSafePositionExtended(
-                level, searchCenter, companion.getType(), 5, 2, 20);
+                companion.level(), searchCenter, companion.getType(), 5, 2, 20);
 
         // Fallback to owner position if offset search fails
         if (safePos == null) {
             safePos = SafePositionFinder.findSafePositionExtended(
-                    level, owner.blockPosition(), companion.getType(), 5, 2, 20);
+                    companion.level(), owner.blockPosition(), companion.getType(), 5, 2, 20);
         }
 
         if (safePos != null) {
@@ -222,7 +220,7 @@ public class CompanionFollowOwnerGoal extends Goal {
      */
     private List<CompanionEntity> getNearbyFollowingCompanions() {
         AABB searchBox = companion.getBoundingBox().inflate(COMPANION_SEARCH_RADIUS);
-        return level.getEntitiesOfClass(CompanionEntity.class, searchBox, other ->
+        return companion.level().getEntitiesOfClass(CompanionEntity.class, searchBox, other ->
                 other != companion &&
                 other.getMode() == CompanionMode.FOLLOW &&
                 other.getOwner() != null &&

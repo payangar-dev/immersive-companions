@@ -50,8 +50,8 @@ public class NeoForgeSpawnEvents {
 
         ChunkPos chunkPos = chunk.getPos();
 
-        // Skip if already processed
-        if (CompanionSpawnLogic.isChunkProcessed(chunkPos)) {
+        // Skip if already processed in this dimension
+        if (CompanionSpawnLogic.isChunkProcessed(serverLevel.dimension(), chunkPos)) {
             return;
         }
 
@@ -62,7 +62,7 @@ public class NeoForgeSpawnEvents {
 
     private static void checkForVillageAndSpawn(ServerLevel level, ChunkPos chunkPos) {
         // Skip if already processed (double-check after scheduling)
-        if (CompanionSpawnLogic.isChunkProcessed(chunkPos)) {
+        if (CompanionSpawnLogic.isChunkProcessed(level.dimension(), chunkPos)) {
             return;
         }
 

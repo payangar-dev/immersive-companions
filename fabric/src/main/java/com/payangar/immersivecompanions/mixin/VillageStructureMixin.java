@@ -4,6 +4,7 @@ import com.payangar.immersivecompanions.spawning.CompanionSpawnLogic;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.util.RandomSource;
+import net.minecraft.world.level.WorldGenLevel;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.StructureManager;
 import net.minecraft.world.level.chunk.ChunkGenerator;
@@ -25,9 +26,10 @@ public abstract class VillageStructureMixin {
     public abstract BoundingBox getBoundingBox();
 
     @Inject(method = "placeInChunk", at = @At("TAIL"))
-    private void onPlaceInChunk(ServerLevel level, StructureManager structureManager,
+    private void onPlaceInChunk(WorldGenLevel levelAccessor, StructureManager structureManager,
                                  ChunkGenerator generator, RandomSource random, BoundingBox boundingBox,
                                  ChunkPos chunkPos, CallbackInfo ci) {
+        ServerLevel level = levelAccessor.getLevel();
         StructureStart self = (StructureStart) (Object) this;
 
         // Check if this is a village structure
